@@ -20,7 +20,7 @@
                         <input type="number" name="quantity" class="form-control" min="1" max="500" value="24" required>
                         <div style="font-size:11.5px; color:var(--text-faint); margin-top:4px;">حداکثر ۵۰۰ عدد در هر بار.</div>
                     </div>
-                    <button type="submit" class="btn btn-gk-primary w-100">تولید و رفتن به صفحه چاپ 🏷️</button>
+                    <button type="submit" class="btn btn-gk-primary w-100">تولید PDF برچسب‌ها 🏷️</button>
                 </form>
             </div>
         </div>
@@ -42,7 +42,7 @@
                             <td class="mono">{{ b.quantity }}</td>
                             <td class="mono">{{ b.created_jalali }}</td>
                             <td class="text-end">
-                                <a href="{% url 'serial_labels_print' b.id %}" class="btn btn-sm btn-ghost">چاپ مجدد 🖨️</a>
+                                <a href="{% url 'serial_labels_print' b.id %}" class="btn btn-sm btn-ghost" target="_blank">دانلود PDF 📄</a>
                             </td>
                         </tr>
                         {% empty %}

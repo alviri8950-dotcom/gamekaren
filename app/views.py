@@ -3,12 +3,12 @@ import json
 import time
 from functools import wraps
 from datetime import timedelta
-from django.http import JsonResponse
+from django.http import JsonResponse, FileResponse
 from django.contrib import messages
 from django.shortcuts import render, redirect
 from django.urls import reverse
 from .print_utils import send_text_to_default_printer
-from .print_pdf_utils import build_invoice_pdf, send_pdf_to_default_printer, build_install_receipt_pdf
+from .print_pdf_utils import build_invoice_pdf, send_pdf_to_default_printer, build_install_receipt_pdf, build_serial_labels_pdf
 from django.views.decorators.http import require_POST
 from django.utils import timezone
 from django.db import transaction
@@ -962,10 +962,16 @@ def serial_labels_print(request, batch_id):
     if not batch:
         messages.error(request, 'این دسته سریال پیدا نشد.')
         return redirect('serial_generator')
-    return render(request, 'serial_labels_print.html', {
-        'batch': batch,
-        'serials': batch.serials.all(),
-    })
+
+    serial_numbers = [s.serial_number for s in batch.serials.all()]
+    filepath, error = build_serial_labels_pdf(batch.id, serial_numbers)
+    if error:
+        messages.error(request, error)
+        return redirect('serial_generator')
+
+    response = FileResponse(open(filepath, 'rb'), content_type='application/pdf')
+    response['Content-Disposition'] = f'inline; filename="serials_{batch.id}.pdf"'
+    return response
 
 REPORT_TYPES = {
     'sales': 'فاکتورهای فروش',

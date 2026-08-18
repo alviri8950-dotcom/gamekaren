@@ -497,3 +497,67 @@ def build_install_receipt_pdf(order):
     filepath = os.path.join(PDF_JOBS_DIR, filename)
     pdf.output(filepath)
     return filepath, None
+
+
+# ==== برچسب سریال (A4، چند ستونه، با بارکد Code39) ====
+LABEL_PAGE_W = 210
+LABEL_PAGE_H = 297
+LABEL_MARGIN = 8
+LABEL_COLS = 3
+LABEL_ROWS = 8
+
+
+def build_serial_labels_pdf(batch_id, serial_numbers):
+    """یک PDF شامل برچسب A4 (چند صفحه در صورت نیاز) برای لیست سریال‌های دادهشده می‌سازه.
+    هر برچسب: نام فروشگاه + بارکد Code39 (قابل اسکن) + خود سریال به‌صورت متن.
+    خروجی: (filepath, None) موفق، یا (None, پیام خطا)."""
+    if not PDF_LIBS_OK:
+        return None, "کتابخانه‌های PDF نصب نشده — روی سرور بزن: pip install fpdf2 arabic-reshaper python-bidi"
+    font_path = _find_font()
+    if not font_path:
+        return None, "فونت فارسی (Tahoma) روی سرور پیدا نشد."
+
+    os.makedirs(PDF_JOBS_DIR, exist_ok=True)
+
+    usable_w = LABEL_PAGE_W - 2 * LABEL_MARGIN
+    usable_h = LABEL_PAGE_H - 2 * LABEL_MARGIN
+    cell_w = usable_w / LABEL_COLS
+    cell_h = usable_h / LABEL_ROWS
+    per_page = LABEL_COLS * LABEL_ROWS
+
+    pdf = FPDF(orientation='P', unit='mm', format=(LABEL_PAGE_W, LABEL_PAGE_H))
+    pdf.set_auto_page_break(False)
+    pdf.add_font('Fa', '', font_path)
+
+    for page_start in range(0, len(serial_numbers), per_page):
+        pdf.add_page()
+        page_serials = serial_numbers[page_start:page_start + per_page]
+        for idx, serial in enumerate(page_serials):
+            row, col = divmod(idx, LABEL_COLS)
+            x = LABEL_MARGIN + col * cell_w
+            y = LABEL_MARGIN + row * cell_h
+
+            # کادر دور برچسب (خط برش)
+            pdf.set_draw_color(180, 180, 180)
+            pdf.set_line_width(0.2)
+            pdf.rect(x + 1, y + 1, cell_w - 2, cell_h - 2)
+
+            pdf.set_font('Fa', '', 8)
+            pdf.set_xy(x, y + 2.5)
+            pdf.cell(cell_w, 4, rtl(SHOP_NAME), align='C')
+
+            barcode_text = f"*{serial}*"
+            # فرمول عرض Code39 در fpdf2: هر کاراکتر ≈ 16/3 برابر پارامتر w
+            target_w = cell_w - 12
+            bar_w = target_w / (len(barcode_text) * 16 / 3)
+            actual_w = bar_w * len(barcode_text) * 16 / 3
+            pdf.code39(barcode_text, x=x + (cell_w - actual_w) / 2, y=y + 8, w=bar_w, h=11)
+
+            pdf.set_font('Fa', '', 10)
+            pdf.set_xy(x, y + cell_h - 8)
+            pdf.cell(cell_w, 5, serial, align='C')
+
+    filename = f"serials_{batch_id}_{int(time.time())}.pdf"
+    filepath = os.path.join(PDF_JOBS_DIR, filename)
+    pdf.output(filepath)
+    return filepath, None
