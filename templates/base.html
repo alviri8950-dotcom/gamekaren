@@ -126,6 +126,7 @@
             <a href="{% url 'game_index' %}" {% if request.resolver_match.url_name == 'game_index' %}class="active"{% endif %}>خانه</a>
             <a href="{% url 'purchase_entry' %}" {% if request.resolver_match.url_name == 'purchase_entry' %}class="active"{% endif %}>خرید</a>
             <a href="{% url 'inventory' %}" {% if request.resolver_match.url_name == 'inventory' %}class="active"{% endif %}>موجودی</a>
+            <a href="{% url 'serial_generator' %}" {% if request.resolver_match.url_name == 'serial_generator' or request.resolver_match.url_name == 'serial_labels_print' %}class="active"{% endif %}>تولید سریال</a>
             <a href="{% url 'game_sales_invoice' %}" {% if request.resolver_match.url_name == 'game_sales_invoice' %}class="active"{% endif %}>فروش</a>
             <a href="{% url 'game_install' %}" {% if request.resolver_match.url_name == 'game_install' %}class="active"{% endif %}>نصب بازی</a>
             <a href="{% url 'expense_entry' %}" {% if request.resolver_match.url_name == 'expense_entry' %}class="active"{% endif %}>هزینه</a>

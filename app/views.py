@@ -121,6 +121,7 @@ from .models import (
     Installer, GameInstallOrder, StockLevel, InventoryItem,
     AccessoryBrand, AccessoryColor, Accessory,
     Party, PartyLedgerEntry, Expense,
+    SerialCounter, GeneratedSerialBatch, GeneratedSerial,
 )
 from django.db.models import Sum, Count
 from .jalali_utils import jalali_to_gregorian_datetime, now_jalali_parts, jalali_month_start, to_jalali_string
@@ -903,6 +904,72 @@ def inventory_view(request):
     return render(request, 'inventory.html', {
         'stock_levels': stock_levels,
         'in_stock_items': in_stock_items,
+    })
+
+
+SERIAL_PREFIX = "KAREN"
+SERIAL_DIGITS = 6  # KAREN + ۶ رقم => مثلاً KAREN000123
+
+
+def _reserve_serial_range(prefix, quantity):
+    """به‌صورت اتمیک یک بازه از شماره‌های ترتیبی رو برای این پیشوند رزرو می‌کنه — حتی زیر بار
+    چند کاربر همزمان، هیچ‌وقت دو نفر یک بازه رو نمی‌گیرن (select_for_update صف می‌بندد)."""
+    with transaction.atomic():
+        counter, _ = SerialCounter.objects.select_for_update().get_or_create(prefix=prefix)
+        start = counter.last_value + 1
+        end = counter.last_value + quantity
+        counter.last_value = end
+        counter.save(update_fields=['last_value'])
+    return start, end
+
+
+@require_permission('can_purchase')
+def serial_generator(request):
+    """تولید سریال برای کالاهایی که سریال کارخانه‌ای ندارن — هر بار تولید، یک بازه‌ی یکتا
+    و تضمین‌شده از سریال‌های KARENxxxxxx رزرو می‌کنه و آماده‌ی چاپ روی برچسب A4 می‌کنه."""
+    if request.method == 'POST':
+        try:
+            quantity = int(request.POST.get('quantity', '0'))
+        except ValueError:
+            quantity = 0
+        note = request.POST.get('note', '').strip()
+
+        if quantity < 1 or quantity > 500:
+            messages.error(request, 'تعداد باید بین ۱ تا ۵۰۰ باشه.')
+            return redirect('serial_generator')
+
+        personnel = _active_personnel(request)
+        start, end = _reserve_serial_range(SERIAL_PREFIX, quantity)
+
+        batch = GeneratedSerialBatch.objects.create(
+            prefix=SERIAL_PREFIX, quantity=quantity, note=note, created_by=personnel,
+        )
+        GeneratedSerial.objects.bulk_create([
+            GeneratedSerial(
+                batch=batch,
+                serial_number=f"{SERIAL_PREFIX}{n:0{SERIAL_DIGITS}d}",
+                sequence_number=n,
+            )
+            for n in range(start, end + 1)
+        ])
+        messages.success(request, f'{quantity} سریال جدید تولید شد.')
+        return redirect('serial_labels_print', batch_id=batch.id)
+
+    recent_batches = GeneratedSerialBatch.objects.select_related('created_by').all()[:30]
+    return render(request, 'serial_generator.html', {
+        'recent_batches': recent_batches,
+        'prefix': SERIAL_PREFIX,
+    })
+
+
+def serial_labels_print(request, batch_id):
+    batch = GeneratedSerialBatch.objects.prefetch_related('serials').filter(id=batch_id).first()
+    if not batch:
+        messages.error(request, 'این دسته سریال پیدا نشد.')
+        return redirect('serial_generator')
+    return render(request, 'serial_labels_print.html', {
+        'batch': batch,
+        'serials': batch.serials.all(),
     })
 
 REPORT_TYPES = {

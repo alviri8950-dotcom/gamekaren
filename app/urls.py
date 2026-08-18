@@ -59,6 +59,10 @@ urlpatterns = [
     path('inventory/', views.inventory_view, name='inventory'),
     path('games/', views.games_manage, name='games_manage'),
 
+    # تولید سریال برای کالاهای بدون سریال کارخانه‌ای + چاپ برچسب A4
+    path('serial-generator/', views.serial_generator, name='serial_generator'),
+    path('serial-generator/<int:batch_id>/print/', views.serial_labels_print, name='serial_labels_print'),
+
     # ابطال و ویرایش (از قسمت گزارش)
     path('purchase/<int:purchase_id>/void/', views.purchase_void, name='purchase_void'),
     path('purchase/<int:purchase_id>/edit/', views.purchase_edit, name='purchase_edit'),

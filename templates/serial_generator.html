@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+{% block title %}تولید سریال - گیم‌کارن{% endblock %}
+{% block content %}
+
+<div class="row g-3">
+    <div class="col-lg-5">
+        <div class="panel">
+            <div class="panel-head">تولید سریال جدید</div>
+            <div class="panel-body">
+                <p style="font-size:13px; color:var(--text-dim); margin-top:0;">
+                    برای کالاهایی که سریال کارخانه‌ای ندارن، این‌جا می‌تونی تعداد دلخواه سریال یکتا
+                    با پیشوند <span class="mono" style="font-weight:700;">{{ prefix }}</span> بسازی و
+                    برچسب‌هاشون رو روی یک برگه A4 چاپ کنی. هر سریال فقط یک بار در کل سیستم صادر می‌شه
+                    و تکراری تولید نمی‌شه.
+                </p>
+                <form method="post" action="{% url 'serial_generator' %}">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label class="form-label">تعداد سریال</label>
+                        <input type="number" name="quantity" class="form-control" min="1" max="500" value="24" required>
+                        <div style="font-size:11.5px; color:var(--text-faint); margin-top:4px;">حداکثر ۵۰۰ عدد در هر بار.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">یادداشت (اختیاری — مثلاً نام کالا)</label>
+                        <input type="text" name="note" class="form-control" placeholder="مثلاً: دسته PS4 مشکی">
+                    </div>
+                    <button type="submit" class="btn btn-gk-primary w-100">تولید و رفتن به صفحه چاپ 🏷️</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-7">
+        <div class="panel">
+            <div class="panel-head d-flex justify-content-between align-items-center">
+                <span>دسته‌های تولیدشده اخیر</span>
+                <span class="mono" style="font-size:11px; color:var(--text-faint);">{{ recent_batches|length }} دسته</span>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-gk mb-0">
+                    <thead><tr><th>#</th><th>تعداد</th><th>یادداشت</th><th>تولیدکننده</th><th>تاریخ</th><th></th></tr></thead>
+                    <tbody>
+                        {% for b in recent_batches %}
+                        <tr>
+                            <td class="mono">#{{ b.id }}</td>
+                            <td class="mono">{{ b.quantity }}</td>
+                            <td>{{ b.note|default:"—" }}</td>
+                            <td>{{ b.created_by.name|default:"—" }}</td>
+                            <td class="mono">{{ b.created_jalali }}</td>
+                            <td class="text-end">
+                                <a href="{% url 'serial_labels_print' b.id %}" class="btn btn-sm btn-ghost">چاپ مجدد 🖨️</a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="6" class="text-center py-4" style="color:var(--text-faint);">هنوز سریالی تولید نشده</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

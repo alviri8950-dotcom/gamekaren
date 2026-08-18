@@ -741,3 +741,55 @@ class Accessory(models.Model):
         if self.model: parts.append(self.model)
         if self.color: parts.append(self.color.name)
         return " - ".join(parts)
+
+
+class SerialCounter(models.Model):
+    """شمارنده‌ی مرکزی برای هر پیشوند سریال — با رزرو اتمیک بازه، تضمین می‌کنه هیچ‌وقت
+    دو سریال یکسان (حتی زیر بار همزمان چند کاربر) تولید نشه."""
+    prefix = models.CharField("پیشوند", max_length=20, unique=True)
+    last_value = models.PositiveIntegerField("آخرین شماره صادرشده", default=0)
+
+    class Meta:
+        verbose_name = "شمارنده سریال"
+        verbose_name_plural = "شمارنده‌های سریال"
+
+    def __str__(self):
+        return f"{self.prefix} (تا شماره {self.last_value})"
+
+
+class GeneratedSerialBatch(models.Model):
+    """یک دسته سریال تولیدشده توسط سیستم — برای چاپ برچسب کالاهایی که سریال کارخانه‌ای ندارن."""
+    prefix = models.CharField("پیشوند", max_length=20, default="KAREN")
+    quantity = models.PositiveIntegerField("تعداد")
+    note = models.CharField("یادداشت (مثلاً نام کالا)", max_length=255, blank=True, default="")
+    created_by = models.ForeignKey(
+        Personnel, verbose_name="تولیدکننده", on_delete=models.SET_NULL, null=True, blank=True, related_name="serial_batches"
+    )
+    created_at = models.DateTimeField("تاریخ تولید", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "دسته سریال تولیدی"
+        verbose_name_plural = "دسته‌های سریال تولیدی"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.prefix} × {self.quantity} - #{self.id}"
+
+    @property
+    def created_jalali(self):
+        return to_jalali_string(self.created_at)
+
+
+class GeneratedSerial(models.Model):
+    """یک سریال منفرد و یکتا در کل سیستم (مثلاً KAREN000123)."""
+    batch = models.ForeignKey(GeneratedSerialBatch, verbose_name="دسته", on_delete=models.CASCADE, related_name="serials")
+    serial_number = models.CharField("سریال", max_length=50, unique=True, db_index=True)
+    sequence_number = models.PositiveIntegerField("شماره ترتیبی", unique=True)
+
+    class Meta:
+        verbose_name = "سریال تولیدی"
+        verbose_name_plural = "سریال‌های تولیدی"
+        ordering = ["sequence_number"]
+
+    def __str__(self):
+        return self.serial_number

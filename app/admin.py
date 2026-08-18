@@ -8,6 +8,7 @@ from .models import (
     Installer, GameInstallOrder, StockLevel, InventoryItem,
     AccessoryBrand, AccessoryColor, Accessory,
     Party, PartyLedgerEntry, Expense,
+    SerialCounter, GeneratedSerialBatch, GeneratedSerial,
 )
 
 
@@ -230,3 +231,21 @@ class InventoryItemAdmin(admin.ModelAdmin):
     list_display = ("serial_number", "device_name", "device_type", "status", "unit_cost", "created_at", "sold_at")
     list_filter = ("status", "device_name")
     search_fields = ("serial_number",)
+
+
+@admin.register(GeneratedSerialBatch)
+class GeneratedSerialBatchAdmin(admin.ModelAdmin):
+    list_display = ("id", "prefix", "quantity", "note", "created_by", "created_at")
+    list_filter = ("prefix",)
+    search_fields = ("note",)
+
+
+@admin.register(GeneratedSerial)
+class GeneratedSerialAdmin(admin.ModelAdmin):
+    list_display = ("serial_number", "sequence_number", "batch")
+    search_fields = ("serial_number",)
+
+
+@admin.register(SerialCounter)
+class SerialCounterAdmin(admin.ModelAdmin):
+    list_display = ("prefix", "last_value")
