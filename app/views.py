@@ -115,6 +115,145 @@ def restore_fifo_cost(device_name, device_type, accessory, quantity_to_restore):
             lot.save(update_fields=['remaining_quantity'])
             remaining -= give_back
 
+
+def _reverse_line_item_inventory(item):
+    """اثر یک ردیف فروش رو روی انبار برمی‌گردونه (سریال یا فله) — قبل از حذف/ابطال اون ردیف صدا زده می‌شه."""
+    if item.serial_number:
+        inv = InventoryItem.objects.filter(sale_line_item=item).first()
+        if inv:
+            inv.status = 'in_stock'
+            inv.sale_line_item = None
+            inv.sold_at = None
+            inv.save(update_fields=['status', 'sale_line_item', 'sold_at'])
+    else:
+        stock, _ = StockLevel.objects.get_or_create(
+            device_name=item.device_name, device_type=item.device_type, accessory=item.accessory,
+            defaults={'quantity': 0}
+        )
+        stock.quantity += item.quantity
+        stock.save(update_fields=['quantity'])
+        restore_fifo_cost(item.device_name, item.device_type, item.accessory, item.quantity)
+
+
+def _reverse_payment(payment, reason=None):
+    """اثر یک پرداخت رو روی موجودی بانک یا حساب اشخاص برمی‌گردونه — قبل از حذف/ابطال اون پرداخت صدا زده می‌شه."""
+    reason = reason or f"حذف پرداخت از فاکتور #{payment.sale_id}"
+    if payment.payment_type == 'transfer' and payment.bank_account:
+        payment.bank_account.balance -= payment.amount
+        payment.bank_account.save(update_fields=['balance'])
+    elif payment.payment_type == 'party_account' and payment.party:
+        party_ledger_add(payment.party.name, -payment.amount, reason, kind=payment.party.kind)
+
+
+def _create_sale_line_items_from_post(sale, request):
+    """ردیف‌های کالای جدید رو از آرایه‌های item_*[] پست می‌خونه و برای sale ثبت می‌کنه —
+    هم در ثبت فاکتور جدید استفاده می‌شه هم برای اضافه‌کردن ردیف تازه هنگام ویرایش."""
+    item_device_name_ids = request.POST.getlist('item_device_name_id[]')
+    item_device_type_ids = request.POST.getlist('item_device_type_id[]')
+    item_device_variant_ids = request.POST.getlist('item_device_variant_id[]')
+    item_device_region_ids = request.POST.getlist('item_device_region_id[]')
+    item_accessory_ids = request.POST.getlist('item_accessory_id[]')
+    item_serials = request.POST.getlist('item_serial[]')
+    item_qtys = request.POST.getlist('item_qty[]')
+    item_prices = request.POST.getlist('item_price[]')
+
+    valid_rows = [
+        i for i in range(len(item_device_name_ids))
+        if item_device_name_ids[i] or (i < len(item_accessory_ids) and item_accessory_ids[i])
+    ]
+    created = []
+    for i in valid_rows:
+        accessory_id = item_accessory_ids[i] if i < len(item_accessory_ids) else ''
+        accessory = Accessory.objects.filter(id=accessory_id).first() if accessory_id else None
+
+        device_name = None
+        device_type = None
+        device_variant = None
+        device_region = None
+        if not accessory:
+            device_name = DeviceName.objects.filter(id=item_device_name_ids[i]).first()
+            if not device_name:
+                continue
+            device_type_id = item_device_type_ids[i] if i < len(item_device_type_ids) else ''
+            device_type = DeviceType.objects.filter(id=device_type_id).first() if device_type_id else None
+            variant_id = item_device_variant_ids[i] if i < len(item_device_variant_ids) else ''
+            device_variant = DeviceVariant.objects.filter(id=variant_id).first() if variant_id else None
+            region_id = item_device_region_ids[i] if i < len(item_device_region_ids) else ''
+            device_region = DeviceRegion.objects.filter(id=region_id).first() if region_id else None
+
+        serial = item_serials[i].strip() if i < len(item_serials) else ''
+        try:
+            qty = max(1, int(item_qtys[i]))
+        except (ValueError, IndexError):
+            qty = 1
+        price_raw = item_prices[i] if i < len(item_prices) else '0'
+        price = re.sub(r'[^\d]', '', price_raw) or '0'
+
+        line_item = SaleLineItem.objects.create(
+            sale=sale, device_name=device_name, device_type=device_type,
+            device_variant=device_variant, device_region=device_region, accessory=accessory,
+            serial_number=serial, quantity=qty, unit_price=int(price),
+        )
+
+        if serial:
+            inv_item = InventoryItem.objects.filter(serial_number=serial, status='in_stock').first()
+            if inv_item:
+                inv_item.status = 'sold'
+                inv_item.sale_line_item = line_item
+                inv_item.sold_at = timezone.now()
+                inv_item.save(update_fields=['status', 'sale_line_item', 'sold_at'])
+                line_item.cost_amount = inv_item.unit_cost
+                line_item.save(update_fields=['cost_amount'])
+        else:
+            stock = StockLevel.objects.filter(device_name=device_name, device_type=device_type, accessory=accessory).first()
+            if stock:
+                stock.quantity -= qty
+                stock.save(update_fields=['quantity'])
+            line_item.cost_amount = consume_fifo_cost(device_name, device_type, accessory, qty)
+            line_item.save(update_fields=['cost_amount'])
+        created.append(line_item)
+    return created
+
+
+def _create_payments_from_post(sale, request):
+    """ردیف‌های پرداخت جدید رو از آرایه‌های payment_*[] پست می‌خونه و برای sale ثبت می‌کنه —
+    هم در ثبت فاکتور جدید استفاده می‌شه هم برای اضافه‌کردن پرداخت تازه هنگام ویرایش."""
+    pay_types = request.POST.getlist('payment_type[]')
+    pay_amounts = request.POST.getlist('payment_amount[]')
+    pay_trackings = request.POST.getlist('payment_tracking[]')
+    pay_accounts = request.POST.getlist('payment_account_id[]')
+    pay_party_names = request.POST.getlist('payment_party_name[]')
+
+    created = []
+    for i, ptype in enumerate(pay_types):
+        amount_raw = pay_amounts[i] if i < len(pay_amounts) else '0'
+        amount = int(re.sub(r'[^\d]', '', amount_raw) or '0')
+        if amount <= 0:
+            continue
+        account_id = pay_accounts[i] if i < len(pay_accounts) else ''
+        party_name = pay_party_names[i].strip() if i < len(pay_party_names) else ''
+        ptype = ptype if ptype in ('pos', 'transfer', 'party_account') else 'pos'
+
+        bank = None
+        party = None
+        if ptype == 'transfer' and account_id:
+            bank = BankAccount.objects.filter(id=account_id).first()
+            if bank:
+                bank.balance += amount
+                bank.save(update_fields=['balance'])
+        elif ptype == 'party_account' and party_name:
+            party = party_ledger_add(party_name, amount, f"فروش نسیه - فاکتور #{sale.id}", kind='customer')
+
+        created.append(Payment.objects.create(
+            sale=sale,
+            payment_type=ptype,
+            amount=amount,
+            tracking_number=pay_trackings[i].strip() if i < len(pay_trackings) else '',
+            bank_account=bank,
+            party=party,
+        ))
+    return created
+
 from .models import (
     GameTitle, GamePlatformAvailability, Personnel, Product, PurchaseRecord, DeviceName, DeviceType, DeviceVariant, DeviceRegion, Supplier,
     SaleTerm, BankAccount, SaleRecord, SaleLineItem, Payment,
@@ -637,19 +776,7 @@ def sale_entry(request):
         term_ids = request.POST.getlist('terms[]')
 
         item_device_name_ids = request.POST.getlist('item_device_name_id[]')
-        item_device_type_ids = request.POST.getlist('item_device_type_id[]')
-        item_device_variant_ids = request.POST.getlist('item_device_variant_id[]')
-        item_device_region_ids = request.POST.getlist('item_device_region_id[]')
         item_accessory_ids = request.POST.getlist('item_accessory_id[]')
-        item_serials = request.POST.getlist('item_serial[]')
-        item_qtys = request.POST.getlist('item_qty[]')
-        item_prices = request.POST.getlist('item_price[]')
-
-        pay_types = request.POST.getlist('payment_type[]')
-        pay_amounts = request.POST.getlist('payment_amount[]')
-        pay_trackings = request.POST.getlist('payment_tracking[]')
-        pay_accounts = request.POST.getlist('payment_account_id[]')
-        pay_party_names = request.POST.getlist('payment_party_name[]')
 
         # حداقل یک ردیف کالای معتبر لازم است (دستگاه یا کالای جانبی)
         valid_rows = [
@@ -660,95 +787,19 @@ def sale_entry(request):
             messages.error(request, 'حداقل یک ردیف کالا لازم است.')
             return redirect('game_sales_invoice')
 
-        sale = SaleRecord.objects.create(
-            customer_name=customer_name,
-            customer_phone=customer_phone,
-            customer_national_id=customer_national_id,
-            change=request.POST.get('change') == 'on',
-            seller=active_personnel,
-        )
-        if term_ids:
-            sale.terms.set(SaleTerm.objects.filter(id__in=term_ids))
-
-        for i in valid_rows:
-            accessory_id = item_accessory_ids[i] if i < len(item_accessory_ids) else ''
-            accessory = Accessory.objects.filter(id=accessory_id).first() if accessory_id else None
-
-            device_name = None
-            device_type = None
-            device_variant = None
-            device_region = None
-            if not accessory:
-                device_name = DeviceName.objects.filter(id=item_device_name_ids[i]).first()
-                if not device_name:
-                    continue
-                device_type_id = item_device_type_ids[i] if i < len(item_device_type_ids) else ''
-                device_type = DeviceType.objects.filter(id=device_type_id).first() if device_type_id else None
-                variant_id = item_device_variant_ids[i] if i < len(item_device_variant_ids) else ''
-                device_variant = DeviceVariant.objects.filter(id=variant_id).first() if variant_id else None
-                region_id = item_device_region_ids[i] if i < len(item_device_region_ids) else ''
-                device_region = DeviceRegion.objects.filter(id=region_id).first() if region_id else None
-
-            serial = item_serials[i].strip() if i < len(item_serials) else ''
-            try:
-                qty = max(1, int(item_qtys[i]))
-            except (ValueError, IndexError):
-                qty = 1
-            price_raw = item_prices[i] if i < len(item_prices) else '0'
-            price = re.sub(r'[^\d]', '', price_raw) or '0'
-
-            line_item = SaleLineItem.objects.create(
-                sale=sale, device_name=device_name, device_type=device_type,
-                device_variant=device_variant, device_region=device_region, accessory=accessory,
-                serial_number=serial, quantity=qty, unit_price=int(price),
+        with transaction.atomic():
+            sale = SaleRecord.objects.create(
+                customer_name=customer_name,
+                customer_phone=customer_phone,
+                customer_national_id=customer_national_id,
+                change=request.POST.get('change') == 'on',
+                seller=active_personnel,
             )
+            if term_ids:
+                sale.terms.set(SaleTerm.objects.filter(id__in=term_ids))
 
-            if serial:
-                # اگه این سریال دقیقاً یک واحد موجود در انبار باشه، همون رو فروخته‌شده علامت بزن
-                inv_item = InventoryItem.objects.filter(serial_number=serial, status='in_stock').first()
-                if inv_item:
-                    inv_item.status = 'sold'
-                    inv_item.sale_line_item = line_item
-                    inv_item.sold_at = timezone.now()
-                    inv_item.save(update_fields=['status', 'sale_line_item', 'sold_at'])
-                    line_item.cost_amount = inv_item.unit_cost
-                    line_item.save(update_fields=['cost_amount'])
-            else:
-                # کالای بدون سریال — از موجودی فله‌ای کسر کن و هزینه‌ی FIFO رو محاسبه کن
-                stock = StockLevel.objects.filter(device_name=device_name, device_type=device_type, accessory=accessory).first()
-                if stock:
-                    stock.quantity -= qty
-                    stock.save(update_fields=['quantity'])
-                line_item.cost_amount = consume_fifo_cost(device_name, device_type, accessory, qty)
-                line_item.save(update_fields=['cost_amount'])
-
-        for i, ptype in enumerate(pay_types):
-            amount_raw = pay_amounts[i] if i < len(pay_amounts) else '0'
-            amount = int(re.sub(r'[^\d]', '', amount_raw) or '0')
-            if amount <= 0:
-                continue
-            account_id = pay_accounts[i] if i < len(pay_accounts) else ''
-            party_name = pay_party_names[i].strip() if i < len(pay_party_names) else ''
-            ptype = ptype if ptype in ('pos', 'transfer', 'party_account') else 'pos'
-
-            bank = None
-            party = None
-            if ptype == 'transfer' and account_id:
-                bank = BankAccount.objects.filter(id=account_id).first()
-                if bank:
-                    bank.balance += amount
-                    bank.save(update_fields=['balance'])
-            elif ptype == 'party_account' and party_name:
-                party = party_ledger_add(party_name, amount, f"فروش نسیه - فاکتور #{sale.id}", kind='customer')
-
-            Payment.objects.create(
-                sale=sale,
-                payment_type=ptype,
-                amount=amount,
-                tracking_number=pay_trackings[i].strip() if i < len(pay_trackings) else '',
-                bank_account=bank,
-                party=party,
-            )
+            _create_sale_line_items_from_post(sale, request)
+            _create_payments_from_post(sale, request)
 
         action = request.POST.get('action', 'save')
         if action == 'save_print':
@@ -1627,31 +1678,13 @@ def sale_void(request, sale_id):
 
     with transaction.atomic():
         for item in sale.items.all():
-            if item.serial_number:
-                inv = InventoryItem.objects.filter(sale_line_item=item).first()
-                if inv:
-                    inv.status = 'in_stock'
-                    inv.sale_line_item = None
-                    inv.sold_at = None
-                    inv.save(update_fields=['status', 'sale_line_item', 'sold_at'])
-            else:
-                stock, _ = StockLevel.objects.get_or_create(
-                    device_name=item.device_name, device_type=item.device_type, accessory=item.accessory,
-                    defaults={'quantity': 0}
-                )
-                stock.quantity += item.quantity
-                stock.save(update_fields=['quantity'])
-                restore_fifo_cost(item.device_name, item.device_type, item.accessory, item.quantity)
+            _reverse_line_item_inventory(item)
         sale.is_voided = True
         sale.voided_at = timezone.now()
         sale.save(update_fields=['is_voided', 'voided_at'])
 
         for payment in sale.payments.select_related('bank_account', 'party').all():
-            if payment.payment_type == 'transfer' and payment.bank_account:
-                payment.bank_account.balance -= payment.amount
-                payment.bank_account.save(update_fields=['balance'])
-            elif payment.payment_type == 'party_account' and payment.party:
-                party_ledger_add(payment.party.name, -payment.amount, f"ابطال فاکتور #{sale.id}", kind=payment.party.kind)
+            _reverse_payment(payment, reason=f"ابطال فاکتور #{sale.id}")
 
     messages.success(request, 'فاکتور فروش ابطال شد و موجودی برگشت داده شد.')
     return _redirect_with_qs('sales', request)
@@ -1659,7 +1692,7 @@ def sale_void(request, sale_id):
 
 @require_permission('can_void_or_edit')
 def sale_edit(request, sale_id):
-    sale = SaleRecord.objects.prefetch_related('items').filter(id=sale_id).first()
+    sale = SaleRecord.objects.prefetch_related('items', 'payments', 'terms').filter(id=sale_id).first()
     if not sale:
         messages.error(request, 'این فاکتور پیدا نشد.')
         return redirect('reports_home')
@@ -1677,10 +1710,46 @@ def sale_edit(request, sale_id):
         sale.customer_name = request.POST.get('customer_name', '').strip()
         sale.customer_phone = request.POST.get('customer_phone', '').strip()
         sale.customer_national_id = request.POST.get('customer_national_id', '').strip()
-        sale.save(update_fields=['customer_name', 'customer_phone', 'customer_national_id'])
+        sale.change = request.POST.get('change') == 'on'
+        sale.save(update_fields=['customer_name', 'customer_phone', 'customer_national_id', 'change'])
+
+        term_ids = request.POST.getlist('terms[]')
+        sale.terms.set(SaleTerm.objects.filter(id__in=term_ids) if term_ids else [])
 
         with transaction.atomic():
-            for item in sale.items.all():
+            # ---- ۱) ردیف‌های موجود: حذف یا ویرایش (سریال / قیمت / تعداد) ----
+            for item in list(sale.items.all()):
+                if request.POST.get(f'delete_item_{item.id}') == 'on':
+                    _reverse_line_item_inventory(item)
+                    item.delete()
+                    continue
+
+                if item.serial_number:
+                    new_serial = request.POST.get(f'item_serial_{item.id}', item.serial_number).strip()
+                    if new_serial and new_serial != item.serial_number:
+                        new_inv = InventoryItem.objects.filter(
+                            serial_number=new_serial, status='in_stock',
+                            device_name=item.device_name, device_type=item.device_type, accessory=item.accessory,
+                        ).first()
+                        if new_inv:
+                            old_inv = InventoryItem.objects.filter(sale_line_item=item).first()
+                            if old_inv:
+                                old_inv.status = 'in_stock'
+                                old_inv.sale_line_item = None
+                                old_inv.sold_at = None
+                                old_inv.save(update_fields=['status', 'sale_line_item', 'sold_at'])
+                            new_inv.status = 'sold'
+                            new_inv.sale_line_item = item
+                            new_inv.sold_at = timezone.now()
+                            new_inv.save(update_fields=['status', 'sale_line_item', 'sold_at'])
+                            item.serial_number = new_serial
+                            item.cost_amount = new_inv.unit_cost
+                        else:
+                            messages.error(
+                                request,
+                                f'سریال «{new_serial}» برای همین کالا در انبار موجود نیست یا قبلاً فروخته شده — سریال قبلی ردیف #{item.id} حفظ شد.'
+                            )
+
                 price_raw = request.POST.get(f'item_price_{item.id}') or str(item.unit_price)
                 item.unit_price = int(re.sub(r'[^\d]', '', price_raw) or item.unit_price)
 
@@ -1707,13 +1776,81 @@ def sale_edit(request, sale_id):
                             per_unit_cost = (item.cost_amount / item.quantity) if item.quantity else 0
                             item.cost_amount = max(0, round(item.cost_amount - per_unit_cost * (-delta)))
                     item.quantity = new_qty
-                item.save(update_fields=['unit_price', 'quantity', 'cost_amount'])
+                item.save(update_fields=['unit_price', 'quantity', 'cost_amount', 'serial_number'])
 
+            # ---- ۲) ردیف‌های کالای تازه (در صورت اضافه‌شدن از فرم پایین صفحه) ----
+            _create_sale_line_items_from_post(sale, request)
+
+            # ---- ۳) پرداخت‌های موجود: حذف یا ویرایش مبلغ ----
+            for payment in list(sale.payments.select_related('bank_account', 'party').all()):
+                if request.POST.get(f'delete_payment_{payment.id}') == 'on':
+                    _reverse_payment(payment, reason=f"حذف پرداخت هنگام ویرایش فاکتور #{sale.id}")
+                    payment.delete()
+                    continue
+
+                new_amount_raw = request.POST.get(f'payment_amount_{payment.id}')
+                if new_amount_raw is not None:
+                    new_amount = int(re.sub(r'[^\d]', '', new_amount_raw) or payment.amount)
+                    delta = new_amount - payment.amount
+                    if delta != 0:
+                        if payment.payment_type == 'transfer' and payment.bank_account:
+                            payment.bank_account.balance += delta
+                            payment.bank_account.save(update_fields=['balance'])
+                        elif payment.payment_type == 'party_account' and payment.party:
+                            party_ledger_add(payment.party.name, delta, f"ویرایش مبلغ پرداخت فاکتور #{sale.id}", kind=payment.party.kind)
+                        payment.amount = new_amount
+                        payment.save(update_fields=['amount'])
+
+            # ---- ۴) پرداخت‌های تازه (در صورت اضافه‌شدن از فرم پایین صفحه) ----
+            _create_payments_from_post(sale, request)
+
+        sale.refresh_from_db()
+        if sale.items.exists() and sale.total_price != sale.total_paid:
+            messages.warning(
+                request,
+                f'توجه: جمع کل فاکتور ({sale.total_price:,} تومان) با جمع پرداخت‌ها ({sale.total_paid:,} تومان) یکسان نیست.'
+            )
         messages.success(request, 'فاکتور ویرایش شد.')
         url = reverse('report_detail', args=['sales'])
         return redirect(f"{url}?{return_qs}" if return_qs else url)
 
-    return render(request, 'sale_edit.html', {'sale': sale, 'return_qs': return_qs})
+    device_names = DeviceName.objects.filter(is_active=True).prefetch_related('types')
+    device_types_map = {}
+    device_variants_map = {}
+    for dn in device_names:
+        types = dn.types.filter(is_active=True)
+        device_types_map[dn.id] = [{"id": t.id, "name": t.name} for t in types]
+        for t in types:
+            variants = t.variants.filter(is_active=True)
+            if variants:
+                device_variants_map[t.id] = [{"id": v.id, "code": v.code} for v in variants]
+    device_regions = DeviceRegion.objects.filter(is_active=True)
+    devices_with_region = list(device_names.filter(has_region=True).values_list('id', flat=True))
+    bank_accounts = BankAccount.objects.filter(is_active=True)
+    accessories = Accessory.objects.filter(is_active=True).select_related('brand', 'color')
+    accessory_names = sorted(set(a.name for a in accessories))
+    accessory_options_map = {}
+    for a in accessories:
+        label_parts = [p for p in [a.brand.name if a.brand else '', a.model, a.color.name if a.color else ''] if p]
+        label = " - ".join(label_parts) if label_parts else "استاندارد"
+        accessory_options_map.setdefault(a.name, []).append({"id": a.id, "label": label})
+
+    return render(request, 'sale_edit.html', {
+        'sale': sale,
+        'return_qs': return_qs,
+        'sale_terms': SaleTerm.objects.filter(is_active=True),
+        'checked_term_ids': set(sale.terms.values_list('id', flat=True)),
+        'device_names_json': json.dumps([{"id": dn.id, "name": dn.name} for dn in device_names], ensure_ascii=False),
+        'device_types_json': json.dumps(device_types_map, ensure_ascii=False),
+        'device_variants_json': json.dumps(device_variants_map, ensure_ascii=False),
+        'devices_with_region_json': json.dumps(devices_with_region),
+        'device_regions_json': json.dumps([{"id": r.id, "code": r.code} for r in device_regions], ensure_ascii=False),
+        'accessory_names_json': json.dumps(accessory_names, ensure_ascii=False),
+        'accessory_options_json': json.dumps(accessory_options_map, ensure_ascii=False),
+        'bank_accounts_json': json.dumps([{"id": a.id, "label": a.label} for a in bank_accounts], ensure_ascii=False),
+        'party_names_json': json.dumps(list(Party.objects.values_list('name', flat=True)), ensure_ascii=False),
+    })
+
 
 
 @require_POST

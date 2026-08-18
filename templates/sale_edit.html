@@ -7,38 +7,66 @@
     <h1 style="font-size:18px; font-weight:800; margin:0;">ویرایش فاکتور #{{ sale.id }}</h1>
 </div>
 
-<form method="post">
+<form method="post" id="saleForm">
     {% csrf_token %}
     <input type="hidden" name="return_qs" value="{{ return_qs }}">
 
     <div class="panel mb-3">
         <div class="panel-head">اطلاعات مشتری</div>
-        <div class="panel-body row g-3">
-            <div class="col-md-4">
-                <label class="form-label">نام مشتری</label>
-                <input type="text" name="customer_name" class="form-control" value="{{ sale.customer_name }}">
+        <div class="panel-body">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">نام مشتری</label>
+                    <input type="text" name="customer_name" class="form-control" value="{{ sale.customer_name }}">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">شماره تماس</label>
+                    <input type="text" name="customer_phone" class="form-control" value="{{ sale.customer_phone }}">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">کد ملی</label>
+                    <input type="text" name="customer_national_id" class="form-control" value="{{ sale.customer_national_id }}">
+                </div>
             </div>
-            <div class="col-md-4">
-                <label class="form-label">شماره تماس</label>
-                <input type="text" name="customer_phone" class="form-control" value="{{ sale.customer_phone }}">
-            </div>
-            <div class="col-md-4">
-                <label class="form-label">کد ملی</label>
-                <input type="text" name="customer_national_id" class="form-control" value="{{ sale.customer_national_id }}">
+            <div class="form-check mt-3">
+                <input class="form-check-input" type="checkbox" name="change" id="changeCheck" {% if sale.change %}checked{% endif %}>
+                <label class="form-check-label" for="changeCheck">تعویض (Change)</label>
             </div>
         </div>
     </div>
 
     <div class="panel mb-3">
-        <div class="panel-head">اقلام فاکتور</div>
+        <div class="panel-head">شرایط فروش</div>
+        <div class="panel-body">
+            <div class="d-flex flex-wrap gap-2">
+                {% for term in sale_terms %}
+                    <label class="d-flex align-items-center gap-2 px-3 py-2 rounded" style="background:var(--bg); border:1px solid var(--border); cursor:pointer; font-size:13.5px;">
+                        <input type="checkbox" name="terms[]" value="{{ term.id }}" {% if term.id in checked_term_ids %}checked{% endif %}>
+                        {{ term.text }}
+                    </label>
+                {% empty %}
+                    <span style="color:var(--text-faint); font-size:13px;">شرطی تعریف نشده.</span>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <div class="panel mb-3">
+        <div class="panel-head">اقلام فعلی فاکتور</div>
         <div class="table-responsive">
             <table class="table table-gk mb-0">
-                <thead><tr><th>کالا</th><th>سریال</th><th>تعداد</th><th>قیمت واحد (تومان)</th></tr></thead>
+                <thead><tr><th>کالا</th><th>سریال</th><th>تعداد</th><th>قیمت واحد (تومان)</th><th>حذف</th></tr></thead>
                 <tbody>
                     {% for item in sale.items.all %}
                     <tr>
                         <td>{% if item.accessory %}{{ item.accessory.name }}{% else %}{{ item.device_name.name }} {{ item.device_type.name|default:"" }}{% endif %}</td>
-                        <td class="mono">{{ item.serial_number|default:"—" }}</td>
+                        <td>
+                            {% if item.serial_number %}
+                                <input type="text" name="item_serial_{{ item.id }}" class="form-control mono" value="{{ item.serial_number }}" style="width:150px;">
+                            {% else %}
+                                <span class="mono" style="color:var(--text-faint);">—</span>
+                            {% endif %}
+                        </td>
                         <td>
                             {% if item.serial_number %}
                                 <span class="mono">{{ item.quantity }}</span>
@@ -47,15 +75,620 @@
                             {% endif %}
                         </td>
                         <td><input type="text" name="item_price_{{ item.id }}" class="form-control mono" value="{{ item.unit_price }}" style="width:140px;"></td>
+                        <td class="text-center">
+                            <input type="checkbox" name="delete_item_{{ item.id }}" class="form-check-input" title="حذف این ردیف">
+                        </td>
                     </tr>
+                    {% empty %}
+                    <tr><td colspan="5" class="text-center py-3" style="color:var(--text-faint);">هیچ ردیفی نمانده</td></tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
-        <div class="form-text p-2" style="color:var(--text-faint);">اقلام دارای سریال، تعدادشان همیشه ۱ است و قابل تغییر نیست. برای حذف یا اضافه‌کردن یک ردیف کالا، فاکتور را ابطال و دوباره ثبت کن.</div>
+        <div class="form-text p-2" style="color:var(--text-faint);">
+            برای سریال جدید، فقط کافیه سریال رو عوض کنی — به‌شرطی که اون سریال توی انبار و برای همین کالا موجود باشه، وگرنه خطا می‌گیری و سریال قبلی می‌مونه.
+            برای عوض‌کردن خودِ کالا (نه فقط سریالش)، این ردیف رو حذف کن و از بخش پایین یک ردیف جدید اضافه کن.
+        </div>
     </div>
 
-    <button type="submit" class="btn btn-gk-primary">ذخیره تغییرات</button>
+    <div class="panel mb-3">
+        <div class="panel-head d-flex justify-content-between align-items-center">
+            <span>افزودن ردیف جدید</span>
+            <button type="button" class="btn btn-sm btn-gk-primary" id="addItemBtn">+ افزودن ردیف</button>
+        </div>
+        <div class="panel-body">
+            <div id="itemRows"></div>
+            <div class="d-flex justify-content-between align-items-center mt-3 p-3 rounded" style="background:var(--bg); border:1px dashed var(--border); font-size:13px;">
+                <span style="color:var(--text-dim);">جمع ردیف‌های تازه</span>
+                <strong class="mono" id="grandTotal">0 تومان</strong>
+            </div>
+        </div>
+    </div>
+
+    <div class="panel mb-3">
+        <div class="panel-head">پرداخت‌های فعلی</div>
+        <div class="table-responsive">
+            <table class="table table-gk mb-0">
+                <thead><tr><th>نوع</th><th>مبلغ (تومان)</th><th>جزئیات</th><th>حذف</th></tr></thead>
+                <tbody>
+                    {% for p in sale.payments.all %}
+                    <tr>
+                        <td>{{ p.get_payment_type_display }}</td>
+                        <td><input type="text" name="payment_amount_{{ p.id }}" class="form-control mono" value="{{ p.amount }}" style="width:140px;"></td>
+                        <td style="font-size:12.5px; color:var(--text-dim);">
+                            {% if p.bank_account %}{{ p.bank_account.label }}{% endif %}
+                            {% if p.party %}{{ p.party.name }}{% endif %}
+                            {% if p.tracking_number %} — پیگیری: {{ p.tracking_number }}{% endif %}
+                        </td>
+                        <td class="text-center">
+                            <input type="checkbox" name="delete_payment_{{ p.id }}" class="form-check-input" title="حذف این پرداخت">
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="4" class="text-center py-3" style="color:var(--text-faint);">پرداختی ثبت نشده</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="panel mb-3">
+        <div class="panel-head d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <span>افزودن پرداخت جدید</span>
+            <div class="d-flex gap-2 flex-wrap">
+                <button type="button" class="btn btn-sm" id="addPosBtn" style="background:var(--teal-dim); border-color:var(--teal); color:var(--teal);">+ پوز</button>
+                <button type="button" class="btn btn-sm" id="addTransferBtn" style="background:var(--violet-dim); border-color:var(--violet); color:var(--violet);">+ انتقالی</button>
+                <button type="button" class="btn btn-sm" id="addPartyBtn" style="background:var(--copper-dim); border-color:var(--copper); color:var(--copper);">+ نسیه</button>
+            </div>
+        </div>
+        <div class="panel-body">
+            <div id="paymentRows"></div>
+            <div class="d-flex justify-content-between align-items-center mt-3 p-3 rounded" style="background:var(--bg); border:1px dashed var(--border); font-size:13px;">
+                <span style="color:var(--text-dim);">جمع پرداخت‌های تازه</span>
+                <strong class="mono" id="paidTotal">0 تومان</strong>
+            </div>
+        </div>
+    </div>
+
+    <button type="submit" class="btn btn-gk-primary w-100">ذخیره تغییرات</button>
 </form>
 
+<script src="https://unpkg.com/@zxing/library@0.20.0/umd/index.min.js"></script>
+<script>
+const deviceNames = {{ device_names_json|safe }};
+const deviceTypesMap = {{ device_types_json|safe }};
+const deviceVariantsMap = {{ device_variants_json|safe }};
+const devicesWithRegion = {{ devices_with_region_json|safe }};
+const deviceRegions = {{ device_regions_json|safe }};
+const bankAccounts = {{ bank_accounts_json|safe }};
+const partyNames = {{ party_names_json|safe }};
+const accessoryNames = {{ accessory_names_json|safe }};
+const accessoryOptionsMap = {{ accessory_options_json|safe }};
+
+function fmt(n){ n = Number(n)||0; return n.toLocaleString('en-US'); }
+function parseNum(v){ return Number(String(v).replace(/[^\d]/g,'')) || 0; }
+
+let itemIndex = 0;
+const itemRows = document.getElementById('itemRows');
+
+function deviceOptionsHtml(){
+    return '<option value="">انتخاب...</option>' + deviceNames.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
+}
+function accessoryNameOptionsHtml(){
+    return '<option value="">انتخاب...</option>' + accessoryNames.map(n => `<option value="${n}">${n}</option>`).join('');
+}
+function deviceRegionOptionsHtml(){
+    return deviceRegions.map(r => `<option value="${r.id}">${r.code}</option>`).join('');
+}
+
+function addItemRow(){
+    const idx = itemIndex++;
+    const row = document.createElement('div');
+    row.className = 'row g-2 align-items-end mb-2 p-2 rounded';
+    row.style.cssText = 'background:var(--panel-2); border:1px solid var(--border);';
+    row.innerHTML = `
+        <div class="col-md-3 col-6 item-device-name-col">
+            <label class="form-label" style="font-size:11px;">نام دستگاه</label>
+            <div class="d-flex gap-1">
+                <select class="form-select item-device-name">${deviceOptionsHtml()}</select>
+                <button type="button" class="btn btn-outline-secondary btn-sm item-mode-toggle" title="لوازم جانبی">🔌</button>
+            </div>
+        </div>
+        <div class="col-md-2 col-6 item-device-type-col">
+            <label class="form-label" style="font-size:11px;">نوع</label>
+            <select class="form-select item-device-type"><option value="">—</option></select>
+        </div>
+        <div class="col-md-1 col-6 item-device-variant-col" style="display:none;">
+            <label class="form-label" style="font-size:11px;">سری</label>
+            <select class="form-select item-device-variant"><option value="">—</option></select>
+        </div>
+        <div class="col-md-1 col-6 item-device-region-col" style="display:none;">
+            <label class="form-label" style="font-size:11px;">ریژن</label>
+            <select class="form-select item-device-region">
+                <option value="">—</option>
+                ${deviceRegionOptionsHtml()}
+            </select>
+        </div>
+        <div class="col-md-7 col-12 item-accessory-col" style="display:none;">
+            <div class="row g-1">
+                <div class="col-6">
+                    <label class="form-label" style="font-size:11px;">نام کالا</label>
+                    <select class="form-select item-accessory-name">${accessoryNameOptionsHtml()}</select>
+                </div>
+                <div class="col-5">
+                    <label class="form-label" style="font-size:11px;">جزئیات (برند/مدل/رنگ)</label>
+                    <select class="form-select item-accessory-detail"><option value="">—</option></select>
+                </div>
+                <div class="col-1 d-flex align-items-end">
+                    <button type="button" class="btn btn-outline-secondary btn-sm item-mode-toggle-back" title="بازگشت به دستگاه">🎮</button>
+                </div>
+            </div>
+            <input type="hidden" class="item-accessory-id">
+        </div>
+        <div class="col-md-2 col-6">
+            <label class="form-label" style="font-size:11px;">سریال</label>
+            <div class="d-flex gap-1">
+                <input type="text" class="form-control item-serial" placeholder="سریال">
+                <button type="button" class="btn btn-outline-info btn-sm item-scan-btn" title="اسکن">📷</button>
+            </div>
+        </div>
+        <div class="col-md-1 col-4">
+            <label class="form-label" style="font-size:11px;">تعداد</label>
+            <input type="number" class="form-control item-qty" min="1" value="1">
+        </div>
+        <div class="col-md-2 col-4">
+            <label class="form-label" style="font-size:11px;">قیمت (تومان)</label>
+            <input type="text" inputmode="numeric" class="form-control item-price" placeholder="0">
+        </div>
+        <div class="col-md-1 col-3">
+            <label class="form-label" style="font-size:11px;">جمع</label>
+            <div class="mono item-total" style="font-size:12.5px; padding:8px 0;">0</div>
+        </div>
+        <div class="col-md-1 col-1">
+            <button type="button" class="btn btn-sm btn-danger-ghost item-remove-btn" title="حذف">✕</button>
+        </div>
+    `;
+    itemRows.appendChild(row);
+
+    const nameSel = row.querySelector('.item-device-name');
+    const typeSel = row.querySelector('.item-device-type');
+    const variantSel = row.querySelector('.item-device-variant');
+    const regionSel = row.querySelector('.item-device-region');
+    const qtyInput = row.querySelector('.item-qty');
+    const priceInput = row.querySelector('.item-price');
+    const totalEl = row.querySelector('.item-total');
+    const accessoryCol = row.querySelector('.item-accessory-col');
+    const accessoryNameSel = row.querySelector('.item-accessory-name');
+    const accessoryDetailSel = row.querySelector('.item-accessory-detail');
+    const accessoryIdInput = row.querySelector('.item-accessory-id');
+    const deviceNameCol = row.querySelector('.item-device-name-col');
+    const deviceTypeCol = row.querySelector('.item-device-type-col');
+    const variantCol = row.querySelector('.item-device-variant-col');
+    const regionCol = row.querySelector('.item-device-region-col');
+
+    function showAsDevice(){
+        deviceNameCol.style.display = '';
+        deviceTypeCol.style.display = '';
+        accessoryCol.style.display = 'none';
+        accessoryIdInput.value = '';
+        refreshVariantRegionVisibility();
+    }
+    function showAsAccessory(){
+        deviceNameCol.style.display = 'none';
+        deviceTypeCol.style.display = 'none';
+        variantCol.style.display = 'none';
+        regionCol.style.display = 'none';
+        accessoryCol.style.display = '';
+    }
+    function refreshVariantRegionVisibility(){
+        const variants = deviceVariantsMap[typeSel.value] || [];
+        if(variants.length){
+            variantSel.innerHTML = '<option value="">انتخاب...</option>' + variants.map(v => `<option value="${v.id}">${v.code}</option>`).join('');
+            variantCol.style.display = '';
+        } else {
+            variantSel.innerHTML = '<option value="">—</option>';
+            variantCol.style.display = 'none';
+        }
+        regionCol.style.display = devicesWithRegion.includes(Number(nameSel.value)) ? '' : 'none';
+    }
+    function refreshAccessoryDetails(){
+        const options = accessoryOptionsMap[accessoryNameSel.value] || [];
+        accessoryDetailSel.innerHTML = options.length
+            ? '<option value="">انتخاب...</option>' + options.map(o => `<option value="${o.id}">${o.label}</option>`).join('')
+            : '<option value="">—</option>';
+        if(options.length === 1){
+            accessoryDetailSel.value = options[0].id;
+            accessoryIdInput.value = options[0].id;
+        } else {
+            accessoryIdInput.value = '';
+        }
+    }
+    accessoryNameSel.addEventListener('change', refreshAccessoryDetails);
+    accessoryDetailSel.addEventListener('change', () => { accessoryIdInput.value = accessoryDetailSel.value; });
+    row.querySelector('.item-mode-toggle').addEventListener('click', () => { showAsAccessory(); refreshAccessoryDetails(); });
+    row.querySelector('.item-mode-toggle-back').addEventListener('click', showAsDevice);
+
+    nameSel.addEventListener('change', () => {
+        const types = deviceTypesMap[nameSel.value] || [];
+        typeSel.innerHTML = types.length
+            ? '<option value="">انتخاب...</option>' + types.map(t => `<option value="${t.id}">${t.name}</option>`).join('')
+            : '<option value="">—</option>';
+        refreshVariantRegionVisibility();
+        recalc();
+    });
+    typeSel.addEventListener('change', refreshVariantRegionVisibility);
+
+    priceInput.addEventListener('input', () => {
+        const digits = priceInput.value.replace(/[^\d]/g,'');
+        priceInput.value = digits ? Number(digits).toLocaleString('en-US') : '';
+        recalc();
+    });
+    qtyInput.addEventListener('input', recalc);
+
+    function recalc(){
+        const total = (parseInt(qtyInput.value)||1) * parseNum(priceInput.value);
+        totalEl.textContent = fmt(total);
+        recalcGrandTotal();
+    }
+
+    const serialInput = row.querySelector('.item-serial');
+
+    function lookupSerial(){
+        const serial = serialInput.value.trim();
+        if(!serial) return;
+        fetch(`/api/serial-lookup/?serial=${encodeURIComponent(serial)}`)
+            .then(r => r.json())
+            .then(data => {
+                if(!data.found){
+                    row.style.borderColor = 'var(--border)';
+                    return;
+                }
+                if(data.already_sold){
+                    row.style.borderColor = 'var(--danger)';
+                    alert(data.message);
+                    return;
+                }
+                row.style.borderColor = 'var(--teal)';
+
+                if(data.is_accessory){
+                    showAsAccessory();
+                    accessoryNameSel.value = data.accessory_name;
+                    refreshAccessoryDetails();
+                    accessoryDetailSel.value = data.accessory_id;
+                    accessoryIdInput.value = data.accessory_id;
+                } else {
+                    showAsDevice();
+                    if(data.device_name_id){
+                        nameSel.value = data.device_name_id;
+                        const types = deviceTypesMap[nameSel.value] || [];
+                        typeSel.innerHTML = types.length
+                            ? '<option value="">انتخاب...</option>' + types.map(t => `<option value="${t.id}">${t.name}</option>`).join('')
+                            : '<option value="">—</option>';
+                        if(data.device_type_id) typeSel.value = data.device_type_id;
+                        refreshVariantRegionVisibility();
+                        if(data.device_variant_id) variantSel.value = data.device_variant_id;
+                        if(data.device_region_id) regionSel.value = data.device_region_id;
+                    }
+                }
+                qtyInput.value = 1;
+                recalc();
+            })
+            .catch(() => {});
+    }
+    serialInput.addEventListener('blur', lookupSerial);
+    serialInput.addEventListener('keydown', (e) => { if(e.key === 'Enter'){ e.preventDefault(); lookupSerial(); } });
+
+    row.querySelector('.item-remove-btn').addEventListener('click', () => {
+        row.remove();
+        recalcGrandTotal();
+    });
+    row.querySelector('.item-scan-btn').addEventListener('click', () => startScan(serialInput, lookupSerial));
+
+    row._recalc = recalc;
+    return row;
+}
+
+function recalcGrandTotal(){
+    let g = 0;
+    itemRows.querySelectorAll('.row').forEach(r => {
+        const qty = parseInt(r.querySelector('.item-qty')?.value) || 1;
+        const price = parseNum(r.querySelector('.item-price')?.value);
+        g += qty * price;
+    });
+    document.getElementById('grandTotal').textContent = fmt(g) + ' تومان';
+}
+
+document.getElementById('addItemBtn').addEventListener('click', () => addItemRow());
+
+// ---- پرداخت‌ها ----
+const paymentRows = document.getElementById('paymentRows');
+
+function accountOptionsHtml(){
+    return bankAccounts.map(a => `<option value="${a.id}">${a.label}</option>`).join('');
+}
+
+function addPaymentRow(type){
+    const row = document.createElement('div');
+    row.className = 'row g-2 align-items-end mb-2 p-2 rounded';
+    row.style.cssText = 'background:var(--panel-2); border:1px solid var(--border);';
+    row.dataset.paymentType = type;
+    if(type === 'pos'){
+        row.innerHTML = `
+            <div class="col-3"><span class="badge" style="background:var(--teal-dim); color:var(--teal);">پوز</span></div>
+            <div class="col-md-4 col-5">
+                <label class="form-label" style="font-size:11px;">مبلغ (تومان)</label>
+                <input type="text" inputmode="numeric" class="form-control pay-amount" placeholder="0">
+            </div>
+            <div class="col-md-4 col-5">
+                <label class="form-label" style="font-size:11px;">شماره پیگیری</label>
+                <input type="text" class="form-control pay-tracking" placeholder="شماره پیگیری">
+            </div>
+            <div class="col-1"><button type="button" class="btn btn-sm btn-danger-ghost pay-remove-btn">✕</button></div>
+        `;
+    } else if(type === 'transfer') {
+        row.innerHTML = `
+            <div class="col-3"><span class="badge" style="background:var(--violet-dim); color:var(--violet);">انتقال</span></div>
+            <div class="col-md-3 col-6">
+                <label class="form-label" style="font-size:11px;">حساب مقصد</label>
+                <select class="form-select pay-account">${accountOptionsHtml()}</select>
+            </div>
+            <div class="col-md-2 col-5">
+                <label class="form-label" style="font-size:11px;">مبلغ</label>
+                <input type="text" inputmode="numeric" class="form-control pay-amount" placeholder="0">
+            </div>
+            <div class="col-md-3 col-6">
+                <label class="form-label" style="font-size:11px;">شماره پیگیری</label>
+                <input type="text" class="form-control pay-tracking" placeholder="شماره پیگیری">
+            </div>
+            <div class="col-1"><button type="button" class="btn btn-sm btn-danger-ghost pay-remove-btn">✕</button></div>
+        `;
+    } else {
+        row.innerHTML = `
+            <div class="col-3"><span class="badge" style="background:var(--copper-dim); color:var(--copper);">نسیه</span></div>
+            <div class="col-md-4 col-6 combo">
+                <label class="form-label" style="font-size:11px;">نام شخص</label>
+                <input type="text" class="form-control pay-party-name" placeholder="نام مشتری" autocomplete="off">
+                <div class="combo-list pay-party-list"></div>
+            </div>
+            <div class="col-md-3 col-5">
+                <label class="form-label" style="font-size:11px;">مبلغ</label>
+                <input type="text" inputmode="numeric" class="form-control pay-amount" placeholder="0">
+            </div>
+            <div class="col-1"><button type="button" class="btn btn-sm btn-danger-ghost pay-remove-btn">✕</button></div>
+        `;
+    }
+    paymentRows.appendChild(row);
+    const amountInput = row.querySelector('.pay-amount');
+    amountInput.addEventListener('input', () => {
+        const digits = amountInput.value.replace(/[^\d]/g,'');
+        amountInput.value = digits ? Number(digits).toLocaleString('en-US') : '';
+        recalcPaidTotal();
+    });
+    row.querySelector('.pay-remove-btn').addEventListener('click', () => { row.remove(); recalcPaidTotal(); });
+
+    const partyInput = row.querySelector('.pay-party-name');
+    if(partyInput){
+        const list = row.querySelector('.pay-party-list');
+        const render = (q) => {
+            q = q.trim().toLowerCase();
+            const matches = q ? partyNames.filter(n => n.toLowerCase().includes(q)) : partyNames;
+            list.innerHTML = matches.length
+                ? matches.slice(0, 20).map(n => `<div class="combo-item" data-pick="${n}">${n}</div>`).join('')
+                : '<div class="combo-empty">موردی پیدا نشد — می‌تونی اسم جدید تایپ کنی</div>';
+            list.classList.add('open');
+        };
+        partyInput.addEventListener('focus', () => render(partyInput.value));
+        partyInput.addEventListener('input', () => render(partyInput.value));
+        list.addEventListener('click', (e) => {
+            const item = e.target.closest('.combo-item');
+            if(item && item.dataset.pick){ partyInput.value = item.dataset.pick; list.classList.remove('open'); }
+        });
+        document.addEventListener('click', (e) => {
+            if(!e.target.closest('.combo')) list.classList.remove('open');
+        });
+    }
+}
+
+function recalcPaidTotal(){
+    let p = 0;
+    paymentRows.querySelectorAll('[data-payment-type]').forEach(r => {
+        p += parseNum(r.querySelector('.pay-amount')?.value);
+    });
+    document.getElementById('paidTotal').textContent = fmt(p) + ' تومان';
+}
+
+document.getElementById('addPosBtn').addEventListener('click', () => addPaymentRow('pos'));
+document.getElementById('addTransferBtn').addEventListener('click', () => addPaymentRow('transfer'));
+document.getElementById('addPartyBtn').addEventListener('click', () => addPaymentRow('party_account'));
+
+// ---- ساخت فیلدهای مخفی هم‌راستا قبل از ارسال فرم (فقط برای ردیف‌های تازه) ----
+document.getElementById('saleForm').addEventListener('submit', function(e){
+    this.querySelectorAll('.hidden-generated').forEach(el => el.remove());
+
+    itemRows.querySelectorAll('.row').forEach(r => {
+        const fields = {
+            'item_device_name_id[]': r.querySelector('.item-device-name')?.value || '',
+            'item_device_type_id[]': r.querySelector('.item-device-type')?.value || '',
+            'item_device_variant_id[]': r.querySelector('.item-device-variant')?.value || '',
+            'item_device_region_id[]': r.querySelector('.item-device-region')?.value || '',
+            'item_accessory_id[]': r.querySelector('.item-accessory-id')?.value || '',
+            'item_serial[]': r.querySelector('.item-serial')?.value || '',
+            'item_qty[]': r.querySelector('.item-qty')?.value || '1',
+            'item_price[]': parseNum(r.querySelector('.item-price')?.value),
+        };
+        for(const [name, val] of Object.entries(fields)){
+            const inp = document.createElement('input');
+            inp.type = 'hidden'; inp.name = name; inp.value = val; inp.className = 'hidden-generated';
+            this.appendChild(inp);
+        }
+    });
+
+    paymentRows.querySelectorAll('[data-payment-type]').forEach(r => {
+        const type = r.dataset.paymentType;
+        const fields = {
+            'payment_type[]': type,
+            'payment_amount[]': parseNum(r.querySelector('.pay-amount')?.value),
+            'payment_tracking[]': r.querySelector('.pay-tracking')?.value || '',
+            'payment_account_id[]': type === 'transfer' ? (r.querySelector('.pay-account')?.value || '') : '',
+            'payment_party_name[]': type === 'party_account' ? (r.querySelector('.pay-party-name')?.value || '') : '',
+        };
+        for(const [name, val] of Object.entries(fields)){
+            const inp = document.createElement('input');
+            inp.type = 'hidden'; inp.name = name; inp.value = val; inp.className = 'hidden-generated';
+            this.appendChild(inp);
+        }
+    });
+});
+
+// ---- اسکن بارکد/سریال (مشترک برای همه ردیف‌های تازه) ----
+function isRejectedSerialBarcode(text){
+    if(!text) return true;
+    return /^P-/i.test(text.trim());
+}
+
+async function startScan(targetInput, onFilled){
+    if(typeof ZXing === 'undefined'){
+        alert('کتابخانه اسکن بارگذاری نشد. اتصال اینترنت گوشی را چک کن.');
+        return;
+    }
+    const video = document.createElement('video');
+    video.autoplay = true; video.playsInline = true; video.muted = true;
+    video.setAttribute('playsinline', ''); video.setAttribute('webkit-playsinline', ''); video.setAttribute('muted', '');
+    video.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;object-fit:cover;z-index:9999;background:#000;';
+    document.body.appendChild(video);
+    const hint = document.createElement('div');
+    hint.textContent = 'بارکد را افقی جلوی دوربین بگیر — لمس تصویر = لغو';
+    hint.style.cssText = 'position:fixed;bottom:30px;left:0;right:0;text-align:center;color:#fff;z-index:10000;font-family:Vazirmatn,sans-serif;font-size:14px;padding:0 20px;';
+    document.body.appendChild(hint);
+
+    const formats = [ZXing.BarcodeFormat.CODE_128, ZXing.BarcodeFormat.CODE_39, ZXing.BarcodeFormat.EAN_13,
+        ZXing.BarcodeFormat.EAN_8, ZXing.BarcodeFormat.UPC_A, ZXing.BarcodeFormat.UPC_E,
+        ZXing.BarcodeFormat.ITF, ZXing.BarcodeFormat.QR_CODE, ZXing.BarcodeFormat.DATA_MATRIX];
+    const hints = new Map();
+    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
+    hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+    let stopped = false;
+    let codeReader = null;
+    let extraControls = [];
+    let rotateTimer = null;
+    const stop = () => { if(stopped) return; stopped = true; try{if(codeReader) codeReader.reset();}catch(e){} if(rotateTimer) clearInterval(rotateTimer); video.remove(); hint.remove(); extraControls.forEach(el => el.remove()); extraControls = []; };
+    video.addEventListener('click', stop);
+
+    async function attachAndScan(){
+        if(stopped) return;
+        codeReader = new ZXing.BrowserMultiFormatReader(hints);
+        const onResult = (result) => {
+            if(result && !stopped){
+                const text = result.getText();
+                if(isRejectedSerialBarcode(text)){
+                    return;
+                }
+                targetInput.value = text; stop(); if(onFilled) onFilled();
+            }
+        };
+        const constraintsOptions = [
+            { video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } } },
+            { video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } } },
+            { video: { facingMode: 'environment' } },
+            { video: true }
+        ];
+        let stream = null;
+        for(const c of constraintsOptions){
+            try{ stream = await navigator.mediaDevices.getUserMedia(c); break; }catch(e){ }
+        }
+        if(!stream){
+            if(!stopped){
+                stop();
+                alert('دسترسی به دوربین ممکن نشد. مطمئن شو آدرس سایت با https:// باز شده و اجازه دوربین داده‌ای، یا سریال را دستی وارد کن.');
+            }
+            return;
+        }
+        video.srcObject = stream;
+        try{ await video.play(); }catch(e){ }
+
+        const track = stream.getVideoTracks()[0];
+        try{
+            if(track && track.getCapabilities && track.getCapabilities().focusMode){
+                await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
+            }
+        }catch(e){ }
+
+        extraControls.forEach(el => el.remove());
+        extraControls = [];
+        let caps = {};
+        try{ caps = track && track.getCapabilities ? track.getCapabilities() : {}; }catch(e){}
+
+        if(caps.torch){
+            let torchOn = false;
+            const torchBtn = document.createElement('button');
+            torchBtn.type = 'button'; torchBtn.textContent = '🔦';
+            torchBtn.style.cssText = 'position:fixed;bottom:90px;left:20px;z-index:10002;width:50px;height:50px;border-radius:50%;border:none;background:rgba(255,255,255,0.2);color:#fff;font-size:22px;';
+            torchBtn.addEventListener('click', async (ev) => {
+                ev.stopPropagation();
+                torchOn = !torchOn;
+                try{ await track.applyConstraints({ advanced: [{ torch: torchOn }] }); }catch(e){}
+                torchBtn.style.background = torchOn ? 'rgba(255,210,0,0.6)' : 'rgba(255,255,255,0.2)';
+            });
+            document.body.appendChild(torchBtn);
+            extraControls.push(torchBtn);
+        }
+
+        if(caps.zoom && caps.zoom.max > caps.zoom.min){
+            let zoomVal = caps.zoom.min;
+            const zoomStep = caps.zoom.step || (caps.zoom.max - caps.zoom.min) / 8 || 0.5;
+            const applyZoom = async (v) => {
+                zoomVal = Math.min(caps.zoom.max, Math.max(caps.zoom.min, v));
+                try{ await track.applyConstraints({ advanced: [{ zoom: zoomVal }] }); }catch(e){}
+            };
+            const zoomOut = document.createElement('button');
+            zoomOut.type = 'button'; zoomOut.textContent = '−';
+            zoomOut.style.cssText = 'position:fixed;bottom:90px;right:80px;z-index:10002;width:50px;height:50px;border-radius:50%;border:none;background:rgba(255,255,255,0.2);color:#fff;font-size:26px;';
+            zoomOut.addEventListener('click', (ev) => { ev.stopPropagation(); applyZoom(zoomVal - zoomStep); });
+            const zoomIn = document.createElement('button');
+            zoomIn.type = 'button'; zoomIn.textContent = '+';
+            zoomIn.style.cssText = 'position:fixed;bottom:90px;right:20px;z-index:10002;width:50px;height:50px;border-radius:50%;border:none;background:rgba(255,255,255,0.2);color:#fff;font-size:22px;';
+            zoomIn.addEventListener('click', (ev) => { ev.stopPropagation(); applyZoom(zoomVal + zoomStep); });
+            document.body.appendChild(zoomOut);
+            document.body.appendChild(zoomIn);
+            extraControls.push(zoomOut, zoomIn);
+        }
+
+        const rotReader = new ZXing.BrowserMultiFormatReader(hints);
+        const rotCanvas = document.createElement('canvas');
+        const rotCtx = rotCanvas.getContext('2d');
+        let rotateDir = 1;
+        rotateTimer = setInterval(() => {
+            if(stopped || !video.videoWidth) return;
+            try{
+                rotCanvas.width = video.videoHeight;
+                rotCanvas.height = video.videoWidth;
+                rotCtx.save();
+                rotCtx.translate(rotCanvas.width / 2, rotCanvas.height / 2);
+                rotCtx.rotate(rotateDir * Math.PI / 2);
+                rotCtx.drawImage(video, -video.videoWidth / 2, -video.videoHeight / 2);
+                rotCtx.restore();
+                const result = rotReader.decodeFromCanvas(rotCanvas);
+                if(result && !stopped){
+                    const text = result.getText();
+                    if(!isRejectedSerialBarcode(text)){
+                        targetInput.value = text; stop(); if(onFilled) onFilled();
+                        return;
+                    }
+                }
+            }catch(e){ }
+            rotateDir *= -1;
+        }, 500);
+
+        try{
+            await codeReader.decodeFromStream(stream, video, onResult);
+        }catch(e){
+            if(!stopped){
+                stop();
+                alert('اسکن با خطا مواجه شد. سریال را دستی وارد کن.');
+            }
+        }
+    }
+    await attachAndScan();
+}
+</script>
 {% endblock %}
