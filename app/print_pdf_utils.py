@@ -502,14 +502,15 @@ def build_install_receipt_pdf(order):
 # ==== برچسب سریال (A4، چند ستونه، با بارکد Code39) ====
 LABEL_PAGE_W = 210
 LABEL_PAGE_H = 297
-LABEL_MARGIN = 8
-LABEL_COLS = 3
-LABEL_ROWS = 8
+LABEL_PAGE_MARGIN = 8   # حاشیه‌ی بیرونی خود صفحه A4
+LABEL_W = 40            # عرض هر برچسب (میلی‌متر) = ۴ سانتی‌متر
+LABEL_H = 10            # ارتفاع هر برچسب (میلی‌متر) = ۱ سانتی‌متر
+LABEL_GAP = 2           # فاصله بین برچسب‌ها (میلی‌متر)
 
 
 def build_serial_labels_pdf(batch_id, serial_numbers):
     """یک PDF شامل برچسب A4 (چند صفحه در صورت نیاز) برای لیست سریال‌های دادهشده می‌سازه.
-    هر برچسب: نام فروشگاه + بارکد Code39 (قابل اسکن) + خود سریال به‌صورت متن.
+    هر برچسب ۴×۱ سانتی‌متر، فقط بارکد Code39 (قابل اسکن) + خود سریال به‌صورت متن — بدون نام فروشگاه.
     خروجی: (filepath, None) موفق، یا (None, پیام خطا)."""
     if not PDF_LIBS_OK:
         return None, "کتابخانه‌های PDF نصب نشده — روی سرور بزن: pip install fpdf2 arabic-reshaper python-bidi"
@@ -519,43 +520,47 @@ def build_serial_labels_pdf(batch_id, serial_numbers):
 
     os.makedirs(PDF_JOBS_DIR, exist_ok=True)
 
-    usable_w = LABEL_PAGE_W - 2 * LABEL_MARGIN
-    usable_h = LABEL_PAGE_H - 2 * LABEL_MARGIN
-    cell_w = usable_w / LABEL_COLS
-    cell_h = usable_h / LABEL_ROWS
-    per_page = LABEL_COLS * LABEL_ROWS
+    usable_w = LABEL_PAGE_W - 2 * LABEL_PAGE_MARGIN
+    usable_h = LABEL_PAGE_H - 2 * LABEL_PAGE_MARGIN
+    pitch_w = LABEL_W + LABEL_GAP
+    pitch_h = LABEL_H + LABEL_GAP
+    cols = int((usable_w + LABEL_GAP) // pitch_w)
+    rows = int((usable_h + LABEL_GAP) // pitch_h)
+    per_page = cols * rows
+    # شبکه رو وسط صفحه قرار می‌دیم (فضای اضافی مساوی از دو طرف)
+    grid_w = cols * LABEL_W + (cols - 1) * LABEL_GAP
+    grid_h = rows * LABEL_H + (rows - 1) * LABEL_GAP
+    start_x = (LABEL_PAGE_W - grid_w) / 2
+    start_y = (LABEL_PAGE_H - grid_h) / 2
 
     pdf = FPDF(orientation='P', unit='mm', format=(LABEL_PAGE_W, LABEL_PAGE_H))
     pdf.set_auto_page_break(False)
     pdf.add_font('Fa', '', font_path)
 
+    barcode_h = 6.5
     for page_start in range(0, len(serial_numbers), per_page):
         pdf.add_page()
         page_serials = serial_numbers[page_start:page_start + per_page]
         for idx, serial in enumerate(page_serials):
-            row, col = divmod(idx, LABEL_COLS)
-            x = LABEL_MARGIN + col * cell_w
-            y = LABEL_MARGIN + row * cell_h
+            row, col = divmod(idx, cols)
+            x = start_x + col * pitch_w
+            y = start_y + row * pitch_h
 
             # کادر دور برچسب (خط برش)
-            pdf.set_draw_color(180, 180, 180)
-            pdf.set_line_width(0.2)
-            pdf.rect(x + 1, y + 1, cell_w - 2, cell_h - 2)
-
-            pdf.set_font('Fa', '', 8)
-            pdf.set_xy(x, y + 2.5)
-            pdf.cell(cell_w, 4, rtl(SHOP_NAME), align='C')
+            pdf.set_draw_color(190, 190, 190)
+            pdf.set_line_width(0.15)
+            pdf.rect(x, y, LABEL_W, LABEL_H)
 
             barcode_text = f"*{serial}*"
             # فرمول عرض Code39 در fpdf2: هر کاراکتر ≈ 16/3 برابر پارامتر w
-            target_w = cell_w - 12
+            target_w = LABEL_W - 3
             bar_w = target_w / (len(barcode_text) * 16 / 3)
             actual_w = bar_w * len(barcode_text) * 16 / 3
-            pdf.code39(barcode_text, x=x + (cell_w - actual_w) / 2, y=y + 8, w=bar_w, h=11)
+            pdf.code39(barcode_text, x=x + (LABEL_W - actual_w) / 2, y=y + 0.6, w=bar_w, h=barcode_h)
 
-            pdf.set_font('Fa', '', 10)
-            pdf.set_xy(x, y + cell_h - 8)
-            pdf.cell(cell_w, 5, serial, align='C')
+            pdf.set_font('Fa', '', 6.5)
+            pdf.set_xy(x, y + barcode_h + 0.9)
+            pdf.cell(LABEL_W, 3, serial, align='C')
 
     filename = f"serials_{batch_id}_{int(time.time())}.pdf"
     filepath = os.path.join(PDF_JOBS_DIR, filename)
