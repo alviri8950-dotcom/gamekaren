@@ -907,8 +907,8 @@ def inventory_view(request):
     })
 
 
-SERIAL_PREFIX = "KAREN"
-SERIAL_DIGITS = 6  # KAREN + ۶ رقم => مثلاً KAREN000123
+SERIAL_PREFIX = "K"
+SERIAL_DIGITS = 6  # پیشوند K + ۶ رقم => مثلاً K000123
 
 
 def _reserve_serial_range(prefix, quantity):
@@ -925,7 +925,7 @@ def _reserve_serial_range(prefix, quantity):
 
 def serial_generator(request):
     """تولید سریال برای کالاهایی که سریال کارخانه‌ای ندارن — هر بار تولید، یک بازه‌ی یکتا
-    و تضمین‌شده از سریال‌های KARENxxxxxx رزرو می‌کنه و آماده‌ی چاپ روی برچسب A4 می‌کنه."""
+    و تضمین‌شده از سریال‌های Kxxxxxx رزرو می‌کنه و آماده‌ی چاپ روی برچسب A4 می‌کنه."""
     if request.method == 'POST':
         try:
             quantity = int(request.POST.get('quantity', '0'))

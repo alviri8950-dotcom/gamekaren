@@ -759,7 +759,7 @@ class SerialCounter(models.Model):
 
 class GeneratedSerialBatch(models.Model):
     """یک دسته سریال تولیدشده توسط سیستم — برای چاپ برچسب کالاهایی که سریال کارخانه‌ای ندارن."""
-    prefix = models.CharField("پیشوند", max_length=20, default="KAREN")
+    prefix = models.CharField("پیشوند", max_length=20, default="K")
     quantity = models.PositiveIntegerField("تعداد")
     created_at = models.DateTimeField("تاریخ تولید", auto_now_add=True)
 
@@ -777,7 +777,7 @@ class GeneratedSerialBatch(models.Model):
 
 
 class GeneratedSerial(models.Model):
-    """یک سریال منفرد و یکتا در کل سیستم (مثلاً KAREN000123)."""
+    """یک سریال منفرد و یکتا در کل سیستم (مثلاً K000123)."""
     batch = models.ForeignKey(GeneratedSerialBatch, verbose_name="دسته", on_delete=models.CASCADE, related_name="serials")
     serial_number = models.CharField("سریال", max_length=50, unique=True, db_index=True)
     sequence_number = models.PositiveIntegerField("شماره ترتیبی", unique=True)

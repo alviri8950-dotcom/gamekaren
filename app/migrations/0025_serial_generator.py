@@ -25,7 +25,7 @@ class Migration(migrations.Migration):
             name='GeneratedSerialBatch',
             fields=[
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('prefix', models.CharField(default='KAREN', max_length=20, verbose_name='پیشوند')),
+                ('prefix', models.CharField(default='K', max_length=20, verbose_name='پیشوند')),
                 ('quantity', models.PositiveIntegerField(verbose_name='تعداد')),
                 ('created_at', models.DateTimeField(auto_now_add=True, verbose_name='تاریخ تولید')),
             ],
