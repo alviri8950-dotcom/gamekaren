@@ -761,10 +761,6 @@ class GeneratedSerialBatch(models.Model):
     """یک دسته سریال تولیدشده توسط سیستم — برای چاپ برچسب کالاهایی که سریال کارخانه‌ای ندارن."""
     prefix = models.CharField("پیشوند", max_length=20, default="KAREN")
     quantity = models.PositiveIntegerField("تعداد")
-    note = models.CharField("یادداشت (مثلاً نام کالا)", max_length=255, blank=True, default="")
-    created_by = models.ForeignKey(
-        Personnel, verbose_name="تولیدکننده", on_delete=models.SET_NULL, null=True, blank=True, related_name="serial_batches"
-    )
     created_at = models.DateTimeField("تاریخ تولید", auto_now_add=True)
 
     class Meta:

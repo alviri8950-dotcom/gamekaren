@@ -27,9 +27,7 @@ class Migration(migrations.Migration):
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('prefix', models.CharField(default='KAREN', max_length=20, verbose_name='پیشوند')),
                 ('quantity', models.PositiveIntegerField(verbose_name='تعداد')),
-                ('note', models.CharField(blank=True, default='', max_length=255, verbose_name='یادداشت (مثلاً نام کالا)')),
                 ('created_at', models.DateTimeField(auto_now_add=True, verbose_name='تاریخ تولید')),
-                ('created_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='serial_batches', to='app.personnel', verbose_name='تولیدکننده')),
             ],
             options={
                 'verbose_name': 'دسته سریال تولیدی',

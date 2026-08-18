@@ -235,9 +235,8 @@ class InventoryItemAdmin(admin.ModelAdmin):
 
 @admin.register(GeneratedSerialBatch)
 class GeneratedSerialBatchAdmin(admin.ModelAdmin):
-    list_display = ("id", "prefix", "quantity", "note", "created_by", "created_at")
+    list_display = ("id", "prefix", "quantity", "created_at")
     list_filter = ("prefix",)
-    search_fields = ("note",)
 
 
 @admin.register(GeneratedSerial)

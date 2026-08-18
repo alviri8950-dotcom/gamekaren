@@ -923,7 +923,6 @@ def _reserve_serial_range(prefix, quantity):
     return start, end
 
 
-@require_permission('can_purchase')
 def serial_generator(request):
     """تولید سریال برای کالاهایی که سریال کارخانه‌ای ندارن — هر بار تولید، یک بازه‌ی یکتا
     و تضمین‌شده از سریال‌های KARENxxxxxx رزرو می‌کنه و آماده‌ی چاپ روی برچسب A4 می‌کنه."""
@@ -932,18 +931,14 @@ def serial_generator(request):
             quantity = int(request.POST.get('quantity', '0'))
         except ValueError:
             quantity = 0
-        note = request.POST.get('note', '').strip()
 
         if quantity < 1 or quantity > 500:
             messages.error(request, 'تعداد باید بین ۱ تا ۵۰۰ باشه.')
             return redirect('serial_generator')
 
-        personnel = _active_personnel(request)
         start, end = _reserve_serial_range(SERIAL_PREFIX, quantity)
 
-        batch = GeneratedSerialBatch.objects.create(
-            prefix=SERIAL_PREFIX, quantity=quantity, note=note, created_by=personnel,
-        )
+        batch = GeneratedSerialBatch.objects.create(prefix=SERIAL_PREFIX, quantity=quantity)
         GeneratedSerial.objects.bulk_create([
             GeneratedSerial(
                 batch=batch,
@@ -955,7 +950,7 @@ def serial_generator(request):
         messages.success(request, f'{quantity} سریال جدید تولید شد.')
         return redirect('serial_labels_print', batch_id=batch.id)
 
-    recent_batches = GeneratedSerialBatch.objects.select_related('created_by').all()[:30]
+    recent_batches = GeneratedSerialBatch.objects.all()[:30]
     return render(request, 'serial_generator.html', {
         'recent_batches': recent_batches,
         'prefix': SERIAL_PREFIX,
