@@ -1,0 +1,135 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}رسید نصب #{{ order.id }} - گیم‌کارن{% endblock %}
+
+{% block content %}
+<div class="text-center mb-3 no-print d-flex justify-content-center gap-2 flex-wrap">
+    <button class="btn btn-gk-primary" onclick="window.print()">🖨️ چاپ روی این دستگاه</button>
+    <form method="post" action="{% url 'install_print_to_printer' order.id %}">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-gk-primary">🖨️ چاپ روی پرینتر مغازه (سرور)</button>
+    </form>
+    <a href="{% url 'game_install' %}" class="btn btn-ghost">→ بازگشت به نصب بازی</a>
+</div>
+
+<div class="form-text text-center mb-3 no-print" style="color:var(--text-faint);">
+    این صفحه روی یک برگه‌ی A5 چاپ می‌شه: نیمه‌ی بالا «رسید مشتری» (A6) و نیمه‌ی پایین «برگه‌ی نصاب» (A6) — بعد از چاپ، از خط‌چین وسط برش بزن.
+</div>
+
+<div id="a5Sheet">
+    <!-- نیمه‌ی بالا: رسید مشتری (A6) -->
+    <div class="a6-half">
+        <div class="a6-header">
+            <img src="{% static 'images/app-icon.jpeg' %}" class="a6-logo">
+            <div class="a6-header-center">
+                <div class="a6-shop-name">گیم‌کارن</div>
+                <div class="a6-title-inline">رسید مشتری</div>
+            </div>
+            <div class="a6-logo-spacer"></div>
+        </div>
+
+        <table class="a6-info-table">
+            <tr><td>نام مشتری</td><td>{{ order.customer_name|default:"—" }}</td><td>شماره سفارش</td><td class="mono">#{{ order.id }}</td></tr>
+            <tr><td>دستگاه</td><td>{{ order.device_name.name }} ({{ order.get_license_type_display }})</td><td>سریال</td><td class="mono">{{ order.serial_number|default:"—" }}</td></tr>
+            <tr><td>تاریخ و ساعت ثبت</td><td colspan="3" class="mono">{{ order.order_jalali }}</td></tr>
+        </table>
+
+        <div class="a6-section-title">لیست بازی‌ها</div>
+        <ol class="a6-games-list">
+            {% for g in order.games %}<li>{{ g.name }}</li>{% empty %}<li style="color:#888;">—</li>{% endfor %}
+        </ol>
+
+        <table class="a6-info-table mt-2">
+            <tr>
+                <td>هزینه نصب</td><td class="mono">{{ order.install_cost }} تومان</td>
+                <td>وضعیت پرداخت</td>
+                <td>{% if order.is_paid %}<strong>پرداخت شده ✓</strong>{% else %}<strong>پرداخت نشده</strong>{% endif %}</td>
+            </tr>
+        </table>
+
+        <div class="a6-sign-row">
+            <div class="a6-sign-box">امضای مشتری</div>
+            <div class="a6-sign-box">محل مهر</div>
+        </div>
+
+        <div class="a6-footer">
+            گیم‌کارن &nbsp;|&nbsp; آدرس: تهران، میدان امام خمینی، پاساژ لباف، طبقه همکف، پلاک 1/20 &nbsp;|&nbsp; تلفن: 02133974370
+        </div>
+    </div>
+
+    <!-- خط برش -->
+    <div class="cut-line"><span>✂️ از این خط برش بزنید</span></div>
+
+    <!-- نیمه‌ی پایین: برگه‌ی نصاب (A6) — فقط نام مشتری و لیست بازی‌ها -->
+    <div class="a6-half">
+        <div class="a6-header">
+            <img src="{% static 'images/app-icon.jpeg' %}" class="a6-logo">
+            <div class="a6-shop-info">
+                <div class="a6-shop-name">گیم‌کارن</div>
+            </div>
+        </div>
+        <div class="a6-title">برگه‌ی نصاب</div>
+
+        <table class="a6-info-table">
+            <tr><td>نام مشتری</td><td colspan="3">{{ order.customer_name|default:"—" }}</td></tr>
+        </table>
+
+        <div class="a6-section-title">لیست بازی‌ها</div>
+        <ol class="a6-games-list">
+            {% for g in order.games %}<li>{{ g.name }}</li>{% empty %}<li style="color:#888;">—</li>{% endfor %}
+        </ol>
+
+        <div class="a6-sign-row">
+            <div class="a6-sign-box">امضای مشتری</div>
+        </div>
+
+        <div class="a6-footer">
+            گیم‌کارن
+        </div>
+    </div>
+</div>
+
+<style>
+#a5Sheet{
+    width:148mm; margin:0 auto; background:#fff; color:#111;
+    font-family:'Vazirmatn', Tahoma, sans-serif;
+}
+.a6-half{
+    width:148mm; height:100mm; box-sizing:border-box;
+    padding:5mm 6mm; display:flex; flex-direction:column;
+    border:1px solid #ccc;
+}
+.a6-header{ display:flex; align-items:center; gap:8px; border-bottom:1px solid #ccc; padding-bottom:4px; margin-bottom:6px; }
+.a6-logo{ width:32px; height:32px; border-radius:8px; object-fit:cover; }
+.a6-logo-spacer{ width:32px; flex-shrink:0; }
+.a6-header-center{ flex:1; text-align:center; }
+.a6-shop-name{ font-weight:800; font-size:14px; }
+.a6-shop-info{ flex:1; }
+.a6-shop-contact{ font-size:9px; color:#555; }
+.a6-title-inline{ font-weight:700; font-size:12px; margin-top:1px; }
+.a6-title{ font-weight:700; font-size:12px; text-align:center; margin-bottom:6px; }
+.a6-info-table{ width:100%; border-collapse:collapse; font-size:10.5px; margin-bottom:6px; }
+.a6-info-table td{ padding:2px 4px; border-bottom:1px dotted #ddd; }
+.a6-info-table td:nth-child(odd){ color:#666; width:22%; white-space:nowrap; }
+.a6-section-title{ font-size:10.5px; font-weight:700; margin-bottom:2px; }
+.a6-games-list{ font-size:10.5px; margin:0 0 6px; padding-inline-start:18px; columns:2; column-gap:14px; }
+.a6-sign-row{ display:flex; gap:10px; margin-top:auto; margin-bottom:6px; }
+.a6-sign-box{
+    flex:1; height:14mm; border:1px dashed #aaa; border-radius:4px;
+    display:flex; align-items:flex-end; justify-content:center;
+    font-size:9px; color:#888; padding-bottom:2px;
+}
+.a6-footer{ font-size:8.5px; color:#777; text-align:center; border-top:1px solid #ccc; padding-top:4px; }
+.cut-line{ text-align:center; font-size:9px; color:#999; border-top:1px dashed #999; margin:0; position:relative; }
+.cut-line span{ background:#fff; padding:0 8px; position:relative; top:-7px; }
+
+@media print{
+    .navbar-gk, .no-print{ display:none !important; }
+    body{ background:#fff; margin:0; }
+    @page{ size:148mm 210mm; margin:0; }
+    #a5Sheet{ width:148mm; }
+    .a6-half{ border:none; }
+    .cut-line{ border-top:1px dashed #999; }
+}
+</style>
+{% endblock %}

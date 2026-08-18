@@ -1,0 +1,98 @@
+{% extends 'base.html' %}
+{% block title %}حساب اشخاص - گیم‌کارن{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <h1 style="font-size:18px; font-weight:800; margin:0;">حساب اشخاص</h1>
+    <form method="get" class="d-flex gap-1 combo" id="partySearchForm">
+        <div style="position:relative; min-width:200px;">
+            <input type="text" name="q" id="partySearchInput" class="form-control form-control-sm" placeholder="جستجوی نام..." value="{{ q }}" autocomplete="off">
+            <div class="combo-list" id="partySearchList"></div>
+        </div>
+        <button type="submit" class="btn btn-sm btn-gk-primary">جستجو</button>
+    </form>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-md-6">
+        <div class="panel p-3">
+            <div style="color:var(--text-faint); font-size:12px;">مجموع بدهکاران (به ما مدیون‌اند)</div>
+            <div class="mono" style="font-size:20px; font-weight:800; color:var(--teal);">{{ debtor_total }} تومان</div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="panel p-3">
+            <div style="color:var(--text-faint); font-size:12px;">مجموع بستانکاران (ما مدیونیم)</div>
+            <div class="mono" style="font-size:20px; font-weight:800; color:var(--danger);">{{ creditor_total }} تومان</div>
+        </div>
+    </div>
+</div>
+
+<div class="panel mb-3">
+    <div class="panel-head">بانک‌ها</div>
+    <div class="table-responsive">
+        <table class="table table-gk mb-0">
+            <thead><tr><th>عنوان حساب</th><th>موجودی</th></tr></thead>
+            <tbody>
+                {% for b in banks %}
+                <tr><td>{{ b.label }}</td><td class="mono">{{ b.balance }} تومان</td></tr>
+                {% empty %}<tr><td colspan="2" class="text-center py-3" style="color:var(--text-faint);">حساب بانکی‌ای ثبت نشده</td></tr>{% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="panel">
+    <div class="panel-head">لیست اشخاص</div>
+    <div class="table-responsive">
+        <table class="table table-gk mb-0">
+            <thead><tr><th>نام</th><th>نوع</th><th>مانده حساب</th><th>وضعیت</th><th></th></tr></thead>
+            <tbody>
+                {% for p in parties %}
+                <tr>
+                    <td>{{ p.name }}</td>
+                    <td>{{ p.get_kind_display }}</td>
+                    <td class="mono">{{ p.balance }}</td>
+                    <td>
+                        {% if p.balance > 0 %}<span class="badge" style="background:var(--teal-dim); color:var(--teal);">بدهکار</span>
+                        {% elif p.balance < 0 %}<span class="badge" style="background:var(--danger-dim); color:var(--danger);">بستانکار</span>
+                        {% else %}<span class="badge" style="background:var(--panel-2); color:var(--text-dim);">تسویه</span>{% endif %}
+                    </td>
+                    <td><a href="{% url 'party_detail' p.id %}" class="btn btn-sm btn-ghost">مشاهده</a></td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="5" class="text-center py-4" style="color:var(--text-faint);">شخصی پیدا نشد</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+const allParties = {{ all_parties_json|safe }};
+const partyDetailUrlTemplate = "{% url 'party_detail' 999999 %}";
+const searchInput = document.getElementById('partySearchInput');
+const searchList = document.getElementById('partySearchList');
+
+function renderPartyOptions(q){
+    q = q.trim().toLowerCase();
+    const matches = q ? allParties.filter(p => p.name.toLowerCase().includes(q)) : allParties;
+    searchList.innerHTML = matches.length
+        ? matches.slice(0, 30).map(p => `<div class="combo-item" data-id="${p.id}" data-name="${p.name}">${p.name}</div>`).join('')
+        : '<div class="combo-empty">شخصی با این اسم پیدا نشد</div>';
+    searchList.classList.add('open');
+}
+searchInput.addEventListener('focus', () => renderPartyOptions(searchInput.value));
+searchInput.addEventListener('input', () => renderPartyOptions(searchInput.value));
+searchList.addEventListener('click', (e) => {
+    const item = e.target.closest('.combo-item');
+    if(item && item.dataset.id){
+        window.location.href = partyDetailUrlTemplate.replace('999999', item.dataset.id);
+    }
+});
+document.addEventListener('click', (e) => {
+    if(!e.target.closest('.combo')) searchList.classList.remove('open');
+});
+</script>
+
+{% endblock %}

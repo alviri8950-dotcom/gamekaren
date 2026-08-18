@@ -1,0 +1,145 @@
+<!-- templates/game_title_manager.html -->
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>مدیریت بازی‌ها</title>
+    <style>
+        body {
+            font-family: Tahoma, Arial, sans-serif;
+            background: #111827;
+            color: #f9fafb;
+            margin: 0;
+            padding: 24px;
+        }
+        .wrap {
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+        .panel {
+            background: #1f2937;
+            border: 1px solid #374151;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+        input[type="text"] {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 10px 12px;
+            border-radius: 6px;
+            border: 1px solid #4b5563;
+            background: #111827;
+            color: #fff;
+        }
+        .row {
+            display: grid;
+            grid-template-columns: 1fr auto auto;
+            gap: 12px;
+            align-items: end;
+        }
+        button {
+            border: 0;
+            border-radius: 6px;
+            padding: 10px 14px;
+            cursor: pointer;
+        }
+        .primary { background: #2563eb; color: #fff; }
+        .secondary { background: #374151; color: #fff; }
+        .danger { background: #dc2626; color: #fff; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border-bottom: 1px solid #374151;
+            padding: 10px;
+            text-align: right;
+        }
+        .muted { color: #9ca3af; }
+        .active { color: #22c55e; }
+        .inactive { color: #ef4444; }
+        .messages p { margin: 8px 0; }
+    </style>
+</head>
+<body>
+<div class="wrap">
+    <h1>مدیریت بازی‌ها</h1>
+
+    <div class="panel">
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="refresh_internet">
+            <button class="primary" type="submit">آپدیت از اینترنت</button>
+        </form>
+    </div>
+
+    <div class="panel">
+        <h2>افزودن دستی بازی</h2>
+        <form method="post" class="row">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="add_manual">
+            <div>
+                <label for="name" class="muted">نام بازی</label>
+                <input id="name" name="name" type="text" placeholder="مثلاً EA FC 24">
+            </div>
+            <label style="display:flex; gap:8px; align-items:center; padding-bottom:10px;">
+                <input type="checkbox" name="is_active" checked>
+                نمایش در لیست
+            </label>
+            <button class="primary" type="submit">ثبت</button>
+        </form>
+    </div>
+
+    <div class="panel messages">
+        {% if messages %}
+            {% for message in messages %}
+                <p>{{ message }}</p>
+            {% endfor %}
+        {% endif %}
+    </div>
+
+    <div class="panel">
+        <h2>لیست بازی‌ها</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>نام</th>
+                    <th>منبع</th>
+                    <th>وضعیت</th>
+                    <th>عملیات</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for game in games %}
+                <tr>
+                    <td>{{ game.name }}</td>
+                    <td>{{ game.source|default:"-" }}</td>
+                    <td>
+                        {% if game.is_active %}
+                            <span class="active">نمایش داده می‌شود</span>
+                        {% else %}
+                            <span class="inactive">نمایش داده نمی‌شود</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <form method="post" style="display:inline;">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="toggle">
+                            <input type="hidden" name="game_id" value="{{ game.id }}">
+                            <button class="secondary" type="submit">تغییر وضعیت</button>
+                        </form>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="4">هنوز بازی‌ای ثبت نشده است.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+</body>
+</html>

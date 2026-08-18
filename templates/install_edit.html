@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+{% block title %}ویرایش سفارش نصب - گیم‌کارن{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <a href="{% url 'report_detail' 'installs' %}?{{ return_qs }}" class="btn btn-sm btn-ghost">→ بازگشت به گزارش نصب</a>
+    <h1 style="font-size:18px; font-weight:800; margin:0;">ویرایش سفارش نصب #{{ order.id }}</h1>
+</div>
+
+<div class="panel">
+    <div class="panel-body">
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="return_qs" value="{{ return_qs }}">
+
+            <div class="mb-3">
+                <label class="form-label">دستگاه</label>
+                <div class="form-control" style="background:var(--panel-2) !important;">{{ order.device_name.name }} ({{ order.get_license_type_display }})</div>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">نام مشتری</label>
+                <input type="text" name="customer_name" class="form-control" value="{{ order.customer_name }}">
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">نصاب</label>
+                <select name="installer_id" class="form-select">
+                    <option value="">— انتخاب نشده —</option>
+                    {% for ins in installers %}
+                    <option value="{{ ins.id }}" {% if order.installer_id == ins.id %}selected{% endif %}>{{ ins.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">هزینه نصب (تومان)</label>
+                <input type="text" name="install_cost" class="form-control mono" value="{{ order.install_cost }}">
+            </div>
+
+            <div class="form-check mb-3">
+                <input type="checkbox" name="delivered" class="form-check-input" id="delivered" {% if order.delivered %}checked{% endif %}>
+                <label class="form-check-label" for="delivered">تحویل داده شد</label>
+            </div>
+
+            <button type="submit" class="btn btn-gk-primary">ذخیره تغییرات</button>
+        </form>
+    </div>
+</div>
+
+{% endblock %}

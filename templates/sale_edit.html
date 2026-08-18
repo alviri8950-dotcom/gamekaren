@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+{% block title %}ویرایش فاکتور - گیم‌کارن{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <a href="{% url 'report_detail' 'sales' %}?{{ return_qs }}" class="btn btn-sm btn-ghost">→ بازگشت به گزارش فروش</a>
+    <h1 style="font-size:18px; font-weight:800; margin:0;">ویرایش فاکتور #{{ sale.id }}</h1>
+</div>
+
+<form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="return_qs" value="{{ return_qs }}">
+
+    <div class="panel mb-3">
+        <div class="panel-head">اطلاعات مشتری</div>
+        <div class="panel-body row g-3">
+            <div class="col-md-4">
+                <label class="form-label">نام مشتری</label>
+                <input type="text" name="customer_name" class="form-control" value="{{ sale.customer_name }}">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">شماره تماس</label>
+                <input type="text" name="customer_phone" class="form-control" value="{{ sale.customer_phone }}">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">کد ملی</label>
+                <input type="text" name="customer_national_id" class="form-control" value="{{ sale.customer_national_id }}">
+            </div>
+        </div>
+    </div>
+
+    <div class="panel mb-3">
+        <div class="panel-head">اقلام فاکتور</div>
+        <div class="table-responsive">
+            <table class="table table-gk mb-0">
+                <thead><tr><th>کالا</th><th>سریال</th><th>تعداد</th><th>قیمت واحد (تومان)</th></tr></thead>
+                <tbody>
+                    {% for item in sale.items.all %}
+                    <tr>
+                        <td>{% if item.accessory %}{{ item.accessory.name }}{% else %}{{ item.device_name.name }} {{ item.device_type.name|default:"" }}{% endif %}</td>
+                        <td class="mono">{{ item.serial_number|default:"—" }}</td>
+                        <td>
+                            {% if item.serial_number %}
+                                <span class="mono">{{ item.quantity }}</span>
+                            {% else %}
+                                <input type="number" name="item_qty_{{ item.id }}" class="form-control" min="1" value="{{ item.quantity }}" style="width:90px;">
+                            {% endif %}
+                        </td>
+                        <td><input type="text" name="item_price_{{ item.id }}" class="form-control mono" value="{{ item.unit_price }}" style="width:140px;"></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="form-text p-2" style="color:var(--text-faint);">اقلام دارای سریال، تعدادشان همیشه ۱ است و قابل تغییر نیست. برای حذف یا اضافه‌کردن یک ردیف کالا، فاکتور را ابطال و دوباره ثبت کن.</div>
+    </div>
+
+    <button type="submit" class="btn btn-gk-primary">ذخیره تغییرات</button>
+</form>
+
+{% endblock %}

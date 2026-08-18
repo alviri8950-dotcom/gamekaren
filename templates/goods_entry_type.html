@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container text-center py-5">
+    <h3 class="mb-5 text-cyan">نوع ورود کالا را انتخاب کنید</h3>
+    <div class="row g-4 justify-content-center">
+        <div class="col-md-4">
+            <a href="{% url 'game_goods_entry' entry_type='purchase' %}" class="nav-link-glass p-5 d-block">
+                <h4>خرید جدید</h4>
+                <small class="text-muted">ورود کالاهای خریداری شده به انبار</small>
+            </a>
+        </div>
+        <div class="col-md-4">
+            <a href="{% url 'game_goods_entry' entry_type='return' %}" class="nav-link-glass p-5 d-block">
+                <h4>مرجوعی مشتری</h4>
+                <small class="text-muted">بازگشت کالا از مشتری به انبار</small>
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

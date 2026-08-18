@@ -1,0 +1,70 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="text-center mb-4">
+    <img src="{% static 'images/app-icon.jpeg' %}" alt="گیم‌کارن" style="width:72px;height:72px;border-radius:18px;object-fit:cover;box-shadow:0 0 0 3px var(--panel), 0 0 0 5px var(--copper-dim), 0 6px 18px rgba(20,25,35,.12);">
+    <div style="margin-top:14px; font-size:20px; font-weight:800; letter-spacing:-.01em;">گیم‌کارن</div>
+    <div style="font-size:13px; color:var(--text-faint);">مدیریت فروشگاه</div>
+</div>
+
+<div class="home-grid">
+    <a href="{% url 'purchase_entry' %}" class="panel home-tile">
+        <span class="home-tile-icon" style="background:var(--copper-dim); color:var(--copper-deep);">🛒</span>
+        <span class="home-tile-label">خرید</span>
+        <span class="home-tile-sub">ثبت خرید کالا و دستگاه</span>
+    </a>
+    <a href="{% url 'game_sales_invoice' %}" class="panel home-tile">
+        <span class="home-tile-icon" style="background:var(--teal-dim); color:var(--teal);">🧾</span>
+        <span class="home-tile-label">فروش</span>
+        <span class="home-tile-sub">ثبت فاکتور فروش</span>
+    </a>
+    <a href="{% url 'game_install' %}" class="panel home-tile">
+        <span class="home-tile-icon" style="background:var(--violet-dim); color:var(--violet);">🎮</span>
+        <span class="home-tile-label">نصب بازی</span>
+        <span class="home-tile-sub">سفارش تا تحویل، ۴ مرحله</span>
+    </a>
+    <a href="{% url 'expense_entry' %}" class="panel home-tile">
+        <span class="home-tile-icon" style="background:var(--danger-dim); color:var(--danger);">💸</span>
+        <span class="home-tile-label">هزینه</span>
+        <span class="home-tile-sub">حقوق، اجاره، قبض و...</span>
+    </a>
+    <a href="{% url 'consignment' %}" class="panel home-tile">
+        <span class="home-tile-icon" style="background:var(--copper-dim); color:var(--copper-deep);">🔄</span>
+        <span class="home-tile-label">امانی</span>
+        <span class="home-tile-sub">کالای امانی مشتری</span>
+    </a>
+    <a href="{% url 'repair' %}" class="panel home-tile">
+        <span class="home-tile-icon" style="background:var(--teal-dim); color:var(--teal);">🛠️</span>
+        <span class="home-tile-label">تعمیرات</span>
+        <span class="home-tile-sub">پذیرش تعمیر دستگاه</span>
+    </a>
+    <a href="{% url 'reports_home' %}" class="panel home-tile">
+        <span class="home-tile-icon" style="background:var(--violet-dim); color:var(--violet);">📊</span>
+        <span class="home-tile-label">گزارش</span>
+        <span class="home-tile-sub">فروش، خرید، سود و زیان</span>
+    </a>
+    <a href="{% url 'parties_list' %}" class="panel home-tile">
+        <span class="home-tile-icon" style="background:var(--copper-dim); color:var(--copper-deep);">👥</span>
+        <span class="home-tile-label">حساب اشخاص</span>
+        <span class="home-tile-sub">بدهکار و بستانکار</span>
+    </a>
+</div>
+
+<style>
+.home-grid{
+    display:grid; grid-template-columns:repeat(2, 1fr); gap:14px; max-width:640px; margin:0 auto;
+}
+@media (max-width:560px){ .home-grid{ grid-template-columns:1fr; } }
+.home-tile{
+    display:flex; flex-direction:column; align-items:flex-start; gap:8px;
+    padding:20px 20px 18px; text-decoration:none; color:var(--text);
+}
+.home-tile-icon{
+    width:44px; height:44px; border-radius:12px; font-size:22px;
+    display:flex; align-items:center; justify-content:center;
+}
+.home-tile-label{ font-size:16.5px; font-weight:700; }
+.home-tile-sub{ font-size:12px; color:var(--text-faint); }
+</style>
+{% endblock %}

@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+{% block title %}ویرایش خرید - گیم‌کارن{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <a href="{% url 'report_detail' 'purchases' %}?{{ return_qs }}" class="btn btn-sm btn-ghost">→ بازگشت به گزارش خرید</a>
+    <h1 style="font-size:18px; font-weight:800; margin:0;">ویرایش خرید</h1>
+</div>
+
+<div class="panel">
+    <div class="panel-body">
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="return_qs" value="{{ return_qs }}">
+
+            <div class="mb-3">
+                <label class="form-label">کالا</label>
+                <div class="form-control" style="background:var(--panel-2) !important;">
+                    {% if purchase.accessory %}{{ purchase.accessory.name }}{% else %}{{ purchase.device_name.name }} {{ purchase.device_type.name|default:"" }}{% endif %}
+                </div>
+                <div class="form-text" style="color:var(--text-faint);">تغییر نوع کالا در این فرم پشتیبانی نمی‌شود — در صورت اشتباه، این خرید را ابطال و دوباره ثبت کن.</div>
+            </div>
+
+            {% if purchase.serial_number %}
+            <div class="mb-3">
+                <label class="form-label">شماره سریال / بارکد</label>
+                <div class="form-control mono" style="background:var(--panel-2) !important;">{{ purchase.serial_number }}</div>
+                <div class="form-text" style="color:var(--text-faint);">این سریال می‌تونه بین چند واحد مشترک باشه — تعداد رو می‌تونی آزادانه تغییر بدی.</div>
+            </div>
+            {% endif %}
+            <div class="mb-3">
+                <label class="form-label">تعداد</label>
+                <input type="number" name="quantity" class="form-control" min="1" value="{{ purchase.quantity }}">
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">قیمت واحد (تومان)</label>
+                <input type="text" name="unit_price" class="form-control mono" value="{{ purchase.unit_price }}">
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">تأمین‌کننده</label>
+                <input type="text" name="supplier_name" class="form-control" value="{{ purchase.supplier.name|default:'' }}">
+            </div>
+
+            <button type="submit" class="btn btn-gk-primary">ذخیره تغییرات</button>
+        </form>
+    </div>
+</div>
+
+{% endblock %}

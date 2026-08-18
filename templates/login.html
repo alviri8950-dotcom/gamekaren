@@ -1,0 +1,69 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ورود - گیم‌کارن</title>
+    <link rel="icon" href="{% static 'images/app-icon.jpeg' %}">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root{
+            --bg:#EEF1F5; --panel:#FFFFFF; --border:#DDE2E9;
+            --text:#161B26; --text-dim:#555F73; --text-faint:#8B93A6;
+            --copper:#D97B3F; --copper-dim:#FBEADC; --copper-deep:#B8611F;
+            --danger:#D0453F; --danger-dim:#FBE7E6;
+        }
+        body{
+            background:var(--bg); color:var(--text); font-family:'Vazirmatn',sans-serif;
+            min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px;
+        }
+        .login-card{
+            background:var(--panel); border:1px solid var(--border); border-radius:16px;
+            box-shadow:0 10px 30px rgba(15,20,30,.12); padding:32px 28px; width:100%; max-width:360px;
+        }
+        .login-logo{ width:64px; height:64px; border-radius:16px; object-fit:cover; display:block; margin:0 auto 14px;
+            box-shadow:0 0 0 3px var(--panel), 0 0 0 5px var(--copper-dim); }
+        .login-title{ text-align:center; font-weight:800; font-size:18px; margin-bottom:2px; }
+        .login-sub{ text-align:center; font-size:12.5px; color:var(--text-faint); margin-bottom:22px; }
+        label{ font-size:12.5px; color:var(--text-dim); font-weight:600; margin-bottom:4px; display:block; }
+        .form-control{
+            background:var(--bg); border:1px solid var(--border); border-radius:9px; font-size:14px;
+            padding:10px 12px; width:100%; margin-bottom:14px;
+        }
+        .form-control:focus{ outline:none; border-color:var(--copper); box-shadow:0 0 0 .18rem rgba(217,123,63,.16); }
+        .btn-login{
+            width:100%; background:var(--copper); border:none; color:#fff; font-weight:700; font-size:14.5px;
+            border-radius:9px; padding:11px; box-shadow:0 2px 6px rgba(217,123,63,.3);
+        }
+        .btn-login:hover{ background:var(--copper-deep); }
+        .alert-error{ background:var(--danger-dim); border:1px solid var(--danger); color:var(--danger); border-radius:9px; padding:10px 12px; font-size:13px; margin-bottom:14px; text-align:center; }
+        .alert-success{ background:#E1F4F1; border:1px solid #1F8F82; color:#1F8F82; border-radius:9px; padding:10px 12px; font-size:13px; margin-bottom:14px; text-align:center; }
+    </style>
+</head>
+<body>
+    <div class="login-card">
+        <img src="{% static 'images/app-icon.jpeg' %}" alt="گیم‌کارن" class="login-logo">
+        <div class="login-title">گیم‌کارن</div>
+        <div class="login-sub">برای ورود، نام و رمز عبورت رو وارد کن</div>
+
+        {% if messages %}
+            {% for message in messages %}
+                <div class="{% if message.tags == 'error' %}alert-error{% else %}alert-success{% endif %}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ next }}">
+            <label>نام</label>
+            <input type="text" name="name" class="form-control" required autofocus autocomplete="username">
+            <label>رمز عبور</label>
+            <input type="password" name="password" class="form-control" required autocomplete="current-password">
+            <button type="submit" class="btn-login">ورود</button>
+        </form>
+    </div>
+</body>
+</html>

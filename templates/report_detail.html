@@ -1,0 +1,397 @@
+{% extends 'base.html' %}
+{% block title %}{{ report_title }} - گیم‌کارن{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <a href="{% url 'reports_home' %}" class="btn btn-sm btn-ghost">→ بازگشت به گزارشات</a>
+    <h1 style="font-size:18px; font-weight:800; margin:0;">{{ report_title }}</h1>
+    {% if report_type == 'sales' %}
+    <button type="button" id="scanInvoiceBtn" class="btn btn-sm btn-gk-primary">📷 اسکن فاکتور</button>
+    {% else %}
+    <span></span>
+    {% endif %}
+</div>
+<a href="{% url 'sale_print' 999999 %}" id="salePrintUrlTemplate" style="display:none;"></a>
+
+<div class="panel mb-3">
+    <div class="panel-body">
+        {% if report_type != 'inventory' %}
+        <div class="d-flex gap-2 flex-wrap mb-3">
+            <a href="?preset=today{% if selected_device_name_id %}&device_name_id={{ selected_device_name_id }}{% endif %}{% if selected_installer_id %}&installer_id={{ selected_installer_id }}{% endif %}" class="btn btn-sm {% if preset == 'today' %}btn-gk-primary{% else %}btn-ghost{% endif %}">امروز</a>
+            <a href="?preset=week{% if selected_device_name_id %}&device_name_id={{ selected_device_name_id }}{% endif %}{% if selected_installer_id %}&installer_id={{ selected_installer_id }}{% endif %}" class="btn btn-sm {% if preset == 'week' %}btn-gk-primary{% else %}btn-ghost{% endif %}">۷ روز اخیر</a>
+            <a href="?preset=month{% if selected_device_name_id %}&device_name_id={{ selected_device_name_id }}{% endif %}{% if selected_installer_id %}&installer_id={{ selected_installer_id }}{% endif %}" class="btn btn-sm {% if preset == 'month' %}btn-gk-primary{% else %}btn-ghost{% endif %}">ماه جاری</a>
+        </div>
+        {% endif %}
+
+        <form method="get" class="row g-2 align-items-end mb-2">
+            {% if report_type != 'inventory' %}
+            <div class="col-auto"><label class="form-label" style="font-size:11px;">از سال</label><input type="number" name="from_y" class="form-control" style="width:85px;" value="{{ now_jalali.year }}"></div>
+            <div class="col-auto"><label class="form-label" style="font-size:11px;">ماه</label><input type="number" name="from_m" class="form-control" style="width:65px;" min="1" max="12" value="1"></div>
+            <div class="col-auto"><label class="form-label" style="font-size:11px;">روز</label><input type="number" name="from_d" class="form-control" style="width:65px;" min="1" max="31" value="1"></div>
+            <div class="col-auto" style="padding-bottom:8px;">تا</div>
+            <div class="col-auto"><label class="form-label" style="font-size:11px;">سال</label><input type="number" name="to_y" class="form-control" style="width:85px;" value="{{ now_jalali.year }}"></div>
+            <div class="col-auto"><label class="form-label" style="font-size:11px;">ماه</label><input type="number" name="to_m" class="form-control" style="width:65px;" min="1" max="12" value="{{ now_jalali.month }}"></div>
+            <div class="col-auto"><label class="form-label" style="font-size:11px;">روز</label><input type="number" name="to_d" class="form-control" style="width:65px;" min="1" max="31" value="{{ now_jalali.day }}"></div>
+            {% endif %}
+
+            {% if report_type == 'sales' or report_type == 'purchases' or report_type == 'inventory' or report_type == 'installs' %}
+            <div class="col-auto">
+                <label class="form-label" style="font-size:11px;">نام کالا</label>
+                <select name="device_name_id" class="form-select" style="width:auto;">
+                    <option value="">همه</option>
+                    {% for dn in device_names %}
+                        <option value="{{ dn.id }}" {% if selected_device_name_id == dn.id|stringformat:"s" %}selected{% endif %}>{{ dn.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
+
+            {% if report_type == 'installs' %}
+            <div class="col-auto">
+                <label class="form-label" style="font-size:11px;">نصاب</label>
+                <select name="installer_id" class="form-select" style="width:auto;">
+                    <option value="">همه</option>
+                    {% for ins in installers %}
+                        <option value="{{ ins.id }}" {% if selected_installer_id == ins.id|stringformat:"s" %}selected{% endif %}>{{ ins.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
+
+            <div class="col-auto"><button type="submit" class="btn btn-sm btn-gk-primary">اعمال فیلتر</button></div>
+        </form>
+
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-2" style="font-size:12px; color:var(--text-faint);">
+            {% if report_type != 'inventory' %}<span class="mono">بازه: {{ date_from_jalali }} تا {{ date_to_jalali }}</span>{% else %}<span>وضعیت لحظه‌ای موجودی</span>{% endif %}
+            <form method="post" action="{% url 'report_print' report_type %}?{{ request.GET.urlencode }}">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-sm btn-gk-primary">🖨️ چاپ روی پرینتر مغازه</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% if report_type == 'sales' %}
+<div class="panel mb-3">
+    <div class="panel-body">
+        <div class="d-flex justify-content-between mb-2"><span style="color:var(--text-dim);">تعداد فاکتور</span><strong class="mono">{{ sales_count }}</strong></div>
+        <div class="d-flex justify-content-between"><span style="color:var(--text-dim);">جمع فروش</span><strong class="mono" style="color:var(--teal);">{{ sales_total }} تومان</strong></div>
+    </div>
+</div>
+<div class="panel">
+    <div class="table-responsive">
+        <table class="table table-gk mb-0">
+            <thead><tr><th>فاکتور</th><th>مشتری</th><th>کالا</th><th>نوع</th><th>سریال</th><th>تعداد</th><th>مبلغ</th><th>فروشنده</th><th>تاریخ</th><th>وضعیت</th><th>عملیات</th></tr></thead>
+            <tbody>
+                {% for i in sale_items %}
+                <tr{% if i.sale.is_voided %} style="opacity:.55;"{% endif %}>
+                    <td class="mono">#{{ i.sale_id }}</td>
+                    <td>{{ i.sale.customer_name|default:"—" }}{% if i.sale.customer_phone %} <span class="mono" style="color:var(--text-faint);">({{ i.sale.customer_phone }})</span>{% endif %}</td>
+                    <td>{% if i.accessory %}{{ i.accessory.name }}{% else %}{{ i.device_name.name }}{% endif %}</td>
+                    <td>{{ i.device_type.name|default:"—" }}</td>
+                    <td class="mono">{{ i.serial_number|default:"—" }}</td>
+                    <td class="mono">{{ i.quantity }}</td>
+                    <td class="mono">{{ i.total_price }}</td>
+                    <td>{{ i.sale.seller.name }}</td>
+                    <td class="mono">{{ i.sale.jalali_datetime }}</td>
+                    <td>{% if i.sale.is_voided %}<span class="badge" style="background:var(--danger-dim); color:var(--danger);">ابطال‌شده</span>{% else %}<span class="badge" style="background:var(--teal-dim); color:var(--teal);">فعال</span>{% endif %}</td>
+                    <td class="d-flex gap-1">
+                        {% if not i.sale.is_voided %}
+                        <a href="{% url 'sale_edit' i.sale_id %}?return_qs={{ request.GET.urlencode|urlencode }}" class="btn btn-sm btn-ghost">ویرایش</a>
+                        <form method="post" action="{% url 'sale_void' i.sale_id %}" onsubmit="return confirm('این فاکتور ابطال شود؟ موجودی مربوطه برگردانده می‌شود.');">
+                            {% csrf_token %}
+                            <input type="hidden" name="return_qs" value="{{ request.GET.urlencode }}">
+                            <button type="submit" class="btn btn-sm" style="background:var(--danger-dim); color:var(--danger); border:none;">ابطال</button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}<tr><td colspan="11" class="text-center py-4" style="color:var(--text-faint);">موردی پیدا نشد</td></tr>{% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% elif report_type == 'purchases' %}
+<div class="panel mb-3">
+    <div class="panel-body">
+        <div class="d-flex justify-content-between mb-2"><span style="color:var(--text-dim);">تعداد خرید</span><strong class="mono">{{ purchases_count }}</strong></div>
+        <div class="d-flex justify-content-between"><span style="color:var(--text-dim);">جمع خرید</span><strong class="mono" style="color:var(--copper);">{{ purchases_total }} تومان</strong></div>
+    </div>
+</div>
+<div class="panel">
+    <div class="table-responsive">
+        <table class="table table-gk mb-0">
+            <thead><tr><th>کالا</th><th>نوع</th><th>سریال</th><th>تعداد</th><th>مبلغ</th><th>تأمین‌کننده</th><th>دریافت‌کننده</th><th>تاریخ</th><th>وضعیت</th><th>عملیات</th></tr></thead>
+            <tbody>
+                {% for p in purchases %}
+                <tr{% if p.is_voided %} style="opacity:.55;"{% endif %}>
+                    <td>{% if p.accessory %}{{ p.accessory.name }}{% else %}{{ p.device_name.name }}{% endif %}</td>
+                    <td>{{ p.device_type.name|default:"—" }}</td>
+                    <td class="mono">{{ p.serial_number|default:"—" }}</td>
+                    <td class="mono">{{ p.quantity }}</td>
+                    <td class="mono">{{ p.total_price }}</td>
+                    <td>{{ p.supplier.name|default:"—" }}</td>
+                    <td>{{ p.receiver.name }}</td>
+                    <td class="mono">{{ p.jalali_datetime }}</td>
+                    <td>{% if p.is_voided %}<span class="badge" style="background:var(--danger-dim); color:var(--danger);">ابطال‌شده</span>{% else %}<span class="badge" style="background:var(--teal-dim); color:var(--teal);">فعال</span>{% endif %}</td>
+                    <td class="d-flex gap-1">
+                        {% if not p.is_voided %}
+                        <a href="{% url 'purchase_edit' p.id %}?return_qs={{ request.GET.urlencode|urlencode }}" class="btn btn-sm btn-ghost">ویرایش</a>
+                        <form method="post" action="{% url 'purchase_void' p.id %}" onsubmit="return confirm('این خرید ابطال شود؟ موجودی مربوطه کم می‌شود.');">
+                            {% csrf_token %}
+                            <input type="hidden" name="return_qs" value="{{ request.GET.urlencode }}">
+                            <button type="submit" class="btn btn-sm" style="background:var(--danger-dim); color:var(--danger); border:none;">ابطال</button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}<tr><td colspan="10" class="text-center py-4" style="color:var(--text-faint);">موردی پیدا نشد</td></tr>{% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% elif report_type == 'banks' %}
+<div class="panel mb-3">
+    <div class="panel-body">
+        <div class="d-flex justify-content-between"><span style="color:var(--text-dim);">پوز (کارتخوان)</span><strong class="mono">{{ pos_count }} تراکنش — {{ pos_total }} تومان</strong></div>
+    </div>
+</div>
+<div class="panel">
+    <div class="table-responsive">
+        <table class="table table-gk mb-0">
+            <thead><tr><th>حساب مقصد</th><th>تعداد تراکنش</th><th>جمع مبلغ</th></tr></thead>
+            <tbody>
+                {% for name, data in bank_breakdown %}
+                <tr><td>{{ name }}</td><td class="mono">{{ data.count }}</td><td class="mono">{{ data.total }} تومان</td></tr>
+                {% empty %}<tr><td colspan="3" class="text-center py-4" style="color:var(--text-faint);">تراکنشی پیدا نشد</td></tr>{% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% elif report_type == 'inventory' %}
+<div class="panel mb-3">
+    <div class="panel-body">
+        <div class="d-flex justify-content-between mb-2"><span style="color:var(--text-dim);">ارزش موجودی سریال‌دار</span><strong class="mono">{{ in_stock_value }} تومان</strong></div>
+        <div class="d-flex justify-content-between mb-2"><span style="color:var(--text-dim);">ارزش موجودی فله‌ای</span><strong class="mono">{{ bulk_stock_value }} تومان</strong></div>
+        <div class="d-flex justify-content-between"><span style="color:var(--text-dim);">جمع کل ارزش موجودی</span><strong class="mono" style="color:var(--teal);">{{ inventory_total_value }} تومان</strong></div>
+    </div>
+</div>
+<div class="panel mb-3">
+    <div class="panel-head">ارزش موجودی به تفکیک گروه کالا</div>
+    <div class="table-responsive">
+        <table class="table table-gk mb-0">
+            <thead><tr><th>گروه کالا</th><th>تعداد سریال‌دار</th><th>ارزش سریال‌دار</th><th>تعداد فله</th><th>ارزش فله</th><th>جمع ارزش</th></tr></thead>
+            <tbody>
+                {% for g in inventory_groups %}
+                <tr>
+                    <td>{{ g.label }}</td>
+                    <td class="mono">{{ g.serial_count }}</td>
+                    <td class="mono">{{ g.serial_value }}</td>
+                    <td class="mono">{{ g.bulk_qty }}</td>
+                    <td class="mono">{{ g.bulk_value }}</td>
+                    <td class="mono" style="color:var(--teal);">{{ g.total_value }}</td>
+                </tr>
+                {% empty %}<tr><td colspan="6" class="text-center py-4" style="color:var(--text-faint);">موردی نیست</td></tr>{% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+<div class="panel mb-3">
+    <div class="panel-head">واحدهای سریال‌دار در انبار</div>
+    <div class="table-responsive">
+        <table class="table table-gk mb-0">
+            <thead><tr><th>سریال</th><th>کالا</th><th>قیمت خرید (تومان)</th></tr></thead>
+            <tbody>
+                {% for item in in_stock_items %}
+                <tr><td class="mono">{{ item.serial_number }}</td><td>{% if item.accessory %}{{ item.accessory.name }}{% else %}{{ item.device_name.name }} {{ item.device_type.name|default:"" }}{% endif %}</td><td class="mono">{{ item.unit_cost }}</td></tr>
+                {% empty %}<tr><td colspan="3" class="text-center py-4" style="color:var(--text-faint);">موردی نیست</td></tr>{% endfor %}
+            </tbody>
+            {% if in_stock_items %}<tfoot><tr><th colspan="2">جمع</th><th class="mono">{{ in_stock_value }}</th></tr></tfoot>{% endif %}
+        </table>
+    </div>
+</div>
+<div class="panel">
+    <div class="panel-head">موجودی فله‌ای</div>
+    <div class="table-responsive">
+        <table class="table table-gk mb-0">
+            <thead><tr><th>کالا</th><th>تعداد</th></tr></thead>
+            <tbody>
+                {% for s in stock_levels %}
+                <tr><td>{% if s.accessory %}{{ s.accessory.name }}{% else %}{{ s.device_name.name }} {{ s.device_type.name|default:"" }}{% endif %}</td><td class="mono">{{ s.quantity }}</td></tr>
+                {% empty %}<tr><td colspan="2" class="text-center py-4" style="color:var(--text-faint);">موردی نیست</td></tr>{% endfor %}
+            </tbody>
+            {% if stock_levels %}<tfoot><tr><th>جمع ارزش (تومان)</th><th class="mono">{{ bulk_stock_value }}</th></tr></tfoot>{% endif %}
+        </table>
+    </div>
+</div>
+
+{% elif report_type == 'installs' %}
+<div class="panel mb-3">
+    <div class="panel-body">
+        <div class="d-flex justify-content-between mb-2"><span style="color:var(--text-dim);">تعداد سفارش</span><strong class="mono">{{ installs_count }}</strong></div>
+        <div class="d-flex justify-content-between mb-2"><span style="color:var(--text-dim);">درآمد</span><strong class="mono" style="color:var(--teal);">{{ installs_revenue }} تومان</strong></div>
+        <div class="d-flex justify-content-between mb-2"><span style="color:var(--text-dim);">تحویل‌شده</span><strong class="mono">{{ installs_delivered }}</strong></div>
+        <div class="d-flex justify-content-between"><span style="color:var(--text-dim);">در جریان</span><strong class="mono">{{ installs_pending }}</strong></div>
+    </div>
+</div>
+<div class="panel">
+    <div class="table-responsive">
+        <table class="table table-gk mb-0">
+            <thead><tr><th>مشتری</th><th>دستگاه</th><th>سریال</th><th>نصاب</th><th>هزینه</th><th>تحویل</th><th>تاریخ</th><th>وضعیت</th><th>عملیات</th></tr></thead>
+            <tbody>
+                {% for o in install_orders %}
+                <tr{% if o.is_voided %} style="opacity:.55;"{% endif %}>
+                    <td>{{ o.customer_name|default:"—" }}</td>
+                    <td>{{ o.device_name.name }} <span class="mono" style="color:var(--text-faint); font-size:11px;">({{ o.get_license_type_display }})</span></td>
+                    <td class="mono">{{ o.serial_number|default:"—" }}</td>
+                    <td>{{ o.installer.name|default:"—" }}</td>
+                    <td class="mono">{{ o.install_cost }}</td>
+                    <td>{% if o.delivered %}<span class="badge" style="background:var(--teal-dim); color:var(--teal);">تحویل شد</span>{% else %}<span class="badge" style="background:var(--panel-2); color:var(--text-dim);">در جریان</span>{% endif %}</td>
+                    <td class="mono">{{ o.order_jalali }}</td>
+                    <td>{% if o.is_voided %}<span class="badge" style="background:var(--danger-dim); color:var(--danger);">ابطال‌شده</span>{% else %}<span class="badge" style="background:var(--teal-dim); color:var(--teal);">فعال</span>{% endif %}</td>
+                    <td class="d-flex gap-1">
+                        {% if not o.is_voided %}
+                        <a href="{% url 'install_edit' o.id %}?return_qs={{ request.GET.urlencode|urlencode }}" class="btn btn-sm btn-ghost">ویرایش</a>
+                        <form method="post" action="{% url 'install_void' o.id %}" onsubmit="return confirm('این سفارش نصب ابطال شود؟');">
+                            {% csrf_token %}
+                            <input type="hidden" name="return_qs" value="{{ request.GET.urlencode }}">
+                            <button type="submit" class="btn btn-sm" style="background:var(--danger-dim); color:var(--danger); border:none;">ابطال</button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}<tr><td colspan="9" class="text-center py-4" style="color:var(--text-faint);">موردی پیدا نشد</td></tr>{% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% elif report_type == 'profit' %}
+<div class="panel mb-3">
+    <div class="panel-head">سود فروش کالا</div>
+    <div class="panel-body">
+        <div class="d-flex justify-content-between py-2" style="border-bottom:1px solid var(--border);"><span style="color:var(--text-dim);">جمع فروش</span><strong class="mono">{{ sales_revenue }} تومان</strong></div>
+        <div class="d-flex justify-content-between py-2" style="border-bottom:1px solid var(--border);"><span style="color:var(--text-dim);">بهای تمام‌شده (سریال‌محور: مستقیم / فله: FIFO)</span><strong class="mono">{{ sales_cogs }} تومان</strong></div>
+        <div class="d-flex justify-content-between py-2">
+            <span style="font-weight:600;">سود فروش</span>
+            <strong class="mono" style="color:{% if sales_profit >= 0 %}var(--teal){% else %}var(--danger){% endif %};">{{ sales_profit }} تومان</strong>
+        </div>
+    </div>
+</div>
+
+<div class="panel mb-3">
+    <div class="panel-head">سود نصب بازی</div>
+    <div class="panel-body">
+        <div class="d-flex justify-content-between py-2" style="border-bottom:1px solid var(--border);"><span style="color:var(--text-dim);">هزینه‌ی نصب دریافتی از مشتری</span><strong class="mono">{{ install_revenue }} تومان</strong></div>
+        <div class="d-flex justify-content-between py-2" style="border-bottom:1px solid var(--border);"><span style="color:var(--text-dim);">دستمزد نصاب‌ها</span><strong class="mono">{{ install_fees }} تومان</strong></div>
+        <div class="d-flex justify-content-between py-2">
+            <span style="font-weight:600;">سود نصب بازی</span>
+            <strong class="mono" style="color:{% if install_profit >= 0 %}var(--teal){% else %}var(--danger){% endif %};">{{ install_profit }} تومان</strong>
+        </div>
+    </div>
+</div>
+
+<div class="panel">
+    <div class="panel-body">
+        <div class="d-flex justify-content-between py-2" style="border-bottom:1px solid var(--border);"><span style="color:var(--text-dim);">جمع هزینه‌های جاری (حقوق/اجاره/قبض/...)</span><strong class="mono">{{ expenses_total }} تومان</strong></div>
+        <div class="d-flex justify-content-between py-3">
+            <span style="font-weight:700; font-size:16px;">سود / زیان خالص</span>
+            <strong class="mono" style="font-size:22px; color:{% if profit_estimate >= 0 %}var(--success){% else %}var(--danger){% endif %};">{{ profit_estimate }} تومان</strong>
+        </div>
+        <div class="form-text" style="color:var(--text-faint);">سود خالص = سود فروش + سود نصب بازی − هزینه‌های جاری. کالای فروخته‌نشده توی این محاسبه نیست (همچنان به‌عنوان موجودی انبار می‌مونه).</div>
+    </div>
+</div>
+{% endif %}
+
+{% if report_type == 'sales' %}
+<script src="https://unpkg.com/@zxing/library@0.20.0/umd/index.min.js"></script>
+<script>
+// بارکد فاکتور به شکل «INV-عدد»ه — با اسکن، مستقیم به صفحه‌ی همون فاکتور می‌ریم
+function isInvoiceBarcode(text){
+    return /^INV-\d+$/i.test((text || '').trim());
+}
+
+document.getElementById('scanInvoiceBtn').addEventListener('click', async function(){
+    if(typeof ZXing === 'undefined'){
+        alert('کتابخانه اسکن بارگذاری نشد. اتصال اینترنت را چک کن و دوباره امتحان کن.');
+        return;
+    }
+
+    const video = document.createElement('video');
+    video.autoplay = true; video.playsInline = true; video.muted = true;
+    video.setAttribute('playsinline', ''); video.setAttribute('webkit-playsinline', ''); video.setAttribute('muted', '');
+    video.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;object-fit:cover;z-index:9999;background:#000;';
+    document.body.appendChild(video);
+
+    const hint = document.createElement('div');
+    hint.textContent = 'بارکد شماره فاکتور را جلوی دوربین بگیر — لمس تصویر = لغو';
+    hint.style.cssText = 'position:fixed;bottom:30px;left:0;right:0;text-align:center;color:#fff;z-index:10000;font-family:Vazirmatn,sans-serif;font-size:14px;padding:0 20px;';
+    document.body.appendChild(hint);
+
+    const formats = [ZXing.BarcodeFormat.CODE_39, ZXing.BarcodeFormat.CODE_128, ZXing.BarcodeFormat.QR_CODE];
+    const hints = new Map();
+    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
+    hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+
+    let stopped = false;
+    let codeReader = null;
+    let extraControls = [];
+    const stop = () => { if(stopped) return; stopped = true; try{if(codeReader) codeReader.reset();}catch(e){} video.remove(); hint.remove(); extraControls.forEach(el => el.remove()); extraControls = []; };
+    video.addEventListener('click', stop);
+
+    function goToInvoice(text){
+        const num = text.trim().replace(/^INV-/i, '');
+        const base = document.getElementById('salePrintUrlTemplate').getAttribute('href');
+        window.location.href = base.replace('999999', num);
+    }
+
+    async function attachAndScan(){
+        if(stopped) return;
+        codeReader = new ZXing.BrowserMultiFormatReader(hints);
+        const onResult = (result) => {
+            if(result && !stopped){
+                const text = result.getText();
+                if(!isInvoiceBarcode(text)) return; // بارکد دیگه‌ای بود، نادیده می‌گیریم و به اسکن ادامه می‌دیم
+                stop();
+                goToInvoice(text);
+            }
+        };
+        const constraintsOptions = [
+            { video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } } },
+            { video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } } },
+            { video: { facingMode: 'environment' } },
+            { video: true }
+        ];
+        let stream = null;
+        for(const c of constraintsOptions){
+            try{ stream = await navigator.mediaDevices.getUserMedia(c); break; }catch(e){ /* بعدی رو امتحان کن */ }
+        }
+        if(!stream){
+            if(!stopped){ stop(); alert('دسترسی به دوربین ممکن نشد.'); }
+            return;
+        }
+        video.srcObject = stream;
+        try{ await video.play(); }catch(e){}
+
+        const track = stream.getVideoTracks()[0];
+        try{
+            if(track && track.getCapabilities && track.getCapabilities().focusMode){
+                await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
+            }
+        }catch(e){}
+
+        try{
+            await codeReader.decodeFromStream(stream, video, onResult);
+        }catch(e){
+            if(!stopped){ stop(); alert('اسکن با خطا مواجه شد.'); }
+        }
+    }
+    await attachAndScan();
+});
+</script>
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,27 @@
+<!-- game_install_report.html -->
+{% extends 'base.html' %}
+{% block title %}گزارش دستگاه‌های تحویل‌نشده{% endblock %}
+
+{% block content %}
+<div class="container" style="direction: rtl; padding: 24px;">
+  <h1>گزارش دستگاه‌های تحویل‌نشده</h1>
+
+  <div class="card" style="padding:20px;">
+    <div style="display:grid; gap:12px;">
+      {% for item in undelivered_items %}
+        <div style="border:1px solid #ddd; padding:12px; border-radius:8px;">
+          <div>نام خریدار: {{ item.buyer_name }}</div>
+          <div>شماره تماس: {{ item.buyer_phone }}</div>
+          <div>شماره سریال: {{ item.serial_number }}</div>
+          <div>دستگاه: {{ item.device }}</div>
+          <div>نام نصاب: {{ item.installer_name }}</div>
+          <div>بازی: {{ item.game_name }}</div>
+          <div>وضعیت: {{ item.delivery_status }}</div>
+        </div>
+      {% empty %}
+        <p>هیچ دستگاه تحویل‌نشده‌ای وجود ندارد.</p>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}

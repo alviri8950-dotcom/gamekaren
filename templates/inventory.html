@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+{% load jalali_filters %}
+{% block title %}موجودی - گیم‌کارن{% endblock %}
+{% block content %}
+
+<div class="panel mb-3">
+    <div class="panel-head d-flex justify-content-between align-items-center">
+        <span>واحدهای دارای سریال (در انبار)</span>
+        <span class="mono" style="font-size:11px; color:var(--text-faint);">{{ in_stock_items|length }} مورد</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-gk mb-0">
+            <thead><tr><th>سریال</th><th>نام دستگاه</th><th>نوع</th><th>قیمت خرید (تومان)</th><th>تاریخ ورود</th></tr></thead>
+            <tbody>
+                {% for item in in_stock_items %}
+                <tr>
+                    <td class="mono">{{ item.serial_number }}</td>
+                    <td>{{ item.device_name.name }}</td>
+                    <td>{{ item.device_type.name|default:"—" }}</td>
+                    <td class="mono">{{ item.unit_cost }}</td>
+                    <td class="mono">{{ item.created_at|jalali }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="5" class="text-center py-4" style="color:var(--text-faint);">فعلاً کالای سریال‌دار در انبار نیست</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="panel">
+    <div class="panel-head d-flex justify-content-between align-items-center">
+        <span>موجودی فله‌ای (بدون سریال)</span>
+        <span class="mono" style="font-size:11px; color:var(--text-faint);">{{ stock_levels|length }} قلم</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-gk mb-0">
+            <thead><tr><th>نام دستگاه</th><th>نوع</th><th>تعداد موجود</th></tr></thead>
+            <tbody>
+                {% for s in stock_levels %}
+                <tr>
+                    <td>{{ s.device_name.name }}</td>
+                    <td>{{ s.device_type.name|default:"—" }}</td>
+                    <td class="mono">{{ s.quantity }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="3" class="text-center py-4" style="color:var(--text-faint);">موجودی فله‌ای ثبت نشده</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% endblock %}
