@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}تحویل کنسول و بازی{% endblock %}
+
+{% block content %}
+<div class="container mt-4" dir="rtl">
+    <div class="card bg-dark text-white border-neon">
+        <div class="card-header border-neon text-right">
+            <h3 class="mb-0"><i class="fas fa-truck-loading ml-2"></i>ثبت تحویل دستگاه به مشتری</h3>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-info bg-dark text-info border-info text-right">
+                لیست دستگاه‌های آماده تحویل در این بخش نمایش داده می‌شود.
+            </div>
+            
+            <div class="table-responsive">
+                <table class="table table-dark table-hover text-right">
+                    <thead>
+                        <tr>
+                            <th>شماره رسید</th>
+                            <th>نام مشتری</th>
+                            <th>مدل دستگاه</th>
+                            <th>وضعیت پرداخت</th>
+                            <th>عملیات تحویل</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td colspan="5" class="text-center text-muted">در حال حاضر دستگاهی برای تحویل موجود نیست.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

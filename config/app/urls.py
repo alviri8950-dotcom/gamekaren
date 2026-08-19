@@ -41,7 +41,6 @@ urlpatterns = [
     path('sale/', views.sale_entry, name='game_sales_invoice'),
     path('sale/<int:sale_id>/print/', views.sale_print, name='sale_print'),
     path('sale/<int:sale_id>/print-to-printer/', views.sale_print_to_printer, name='sale_print_to_printer'),
-    path('sale/<int:sale_id>/finalize/', views.sale_finalize, name='sale_finalize'),
     path('api/serial-lookup/', views.serial_lookup, name='serial_lookup'),
 
     # کاربر فعال

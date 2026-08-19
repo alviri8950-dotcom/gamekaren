@@ -1,0 +1,543 @@
+{% extends 'base.html' %}
+{% block title %}ثبت خرید - گیم‌کارن{% endblock %}
+
+{% block content %}
+<div class="panel mb-4" style="max-width:640px;">
+    <div class="panel-head">ثبت خرید جدید</div>
+    <div class="panel-body">
+        <form method="post" id="purchaseForm">
+            {% csrf_token %}
+
+            <div class="mb-3">
+                <label class="form-label">نوع کالا</label>
+                <div class="d-flex gap-2 mb-2">
+                    <button type="button" class="btn btn-sm item-type-btn active" data-type="device" style="background:var(--teal-dim); border-color:var(--teal); color:var(--teal);">🎮 کنسول/دستگاه</button>
+                    <button type="button" class="btn btn-sm item-type-btn" data-type="accessory" style="background:var(--panel-2); border-color:var(--border); color:var(--text-dim);">🔌 لوازم جانبی</button>
+                </div>
+                <input type="hidden" name="item_type" id="itemTypeInput" value="device">
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">شماره سریال / بارکد (اختیاری)</label>
+                <div class="d-flex gap-2">
+                    <input type="text" name="serial_number" id="serialInput" class="form-control" placeholder="سریال/بارکد را وارد کن یا اسکن بزن — می‌تونه بین چند واحد مشترک باشه" autocomplete="off">
+                    <button type="button" class="btn btn-outline-info" id="scanBtn" title="اسکن با دوربین">📷</button>
+                </div>
+            </div>
+
+            <div id="deviceFieldsDiv">
+                <div class="mb-3">
+                    <label class="form-label">نام دستگاه</label>
+                    <select name="device_name_id" id="deviceNameSelect" class="form-select">
+                        <option value="">انتخاب کن...</option>
+                        {% for dn in device_names %}
+                            <option value="{{ dn.id }}">{{ dn.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <div class="form-text mt-1" style="color:var(--text-faint);">
+                        نام جدید نیست توی لیست؟ از «تنظیمات (پرسنل و کالاها)» بالای صفحه اضافه‌اش کن.
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">نوع دستگاه</label>
+                    <select name="device_type_id" id="deviceTypeSelect" class="form-select">
+                        <option value="">— ابتدا نام دستگاه را انتخاب کن —</option>
+                    </select>
+                </div>
+
+                <div class="mb-3" id="variantField">
+                    <label class="form-label">شماره سری</label>
+                    <select name="device_variant_id" id="deviceVariantSelect" class="form-select">
+                        <option value="">انتخاب کن...</option>
+                    </select>
+                </div>
+
+                <div class="mb-3" id="regionField">
+                    <label class="form-label">ریژن</label>
+                    <select name="device_region_id" id="deviceRegionSelect" class="form-select">
+                        <option value="">انتخاب کن...</option>
+                        {% for r in device_regions %}
+                            <option value="{{ r.id }}">{{ r.code }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <div id="accessoryFieldsDiv" style="display:none;">
+                <div class="mb-3 combo">
+                    <label class="form-label">نام کالای جانبی</label>
+                    <input type="text" name="accessory_name" id="accessoryNameInput" class="form-control" placeholder="مثلاً کابل HDMI" autocomplete="off">
+                    <div class="combo-list" id="accessoryNameList">
+                        {% for n in accessory_names %}<div class="combo-item" data-pick="{{ n }}">{{ n }}</div>{% endfor %}
+                    </div>
+                </div>
+                <div class="row g-3 mb-3">
+                    <div class="col-6 combo">
+                        <label class="form-label">برند</label>
+                        <input type="text" name="accessory_brand" id="brandInput" class="form-control" placeholder="برند" autocomplete="off">
+                        <div class="combo-list" id="brandList">
+                            {% for b in accessory_brands %}<div class="combo-item" data-pick="{{ b.name }}">{{ b.name }}</div>{% endfor %}
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">مدل</label>
+                        <input type="text" name="accessory_model" id="accessoryModelInput" class="form-control" placeholder="مدل">
+                    </div>
+                </div>
+                <div class="mb-3 combo">
+                    <label class="form-label">رنگ</label>
+                    <input type="text" name="accessory_color" id="colorInput" class="form-control" placeholder="رنگ" autocomplete="off">
+                    <div class="combo-list" id="colorList">
+                        {% for c in accessory_colors %}<div class="combo-item" data-pick="{{ c.name }}">{{ c.name }}</div>{% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">تعداد</label>
+                <input type="number" name="quantity" id="quantityInput" class="form-control" min="1" value="1" required>
+                <div class="form-text mt-1" style="color:var(--text-faint);">اگه سریال/بارکد وارد کردی و بین چند واحد مشترکه (مثلاً همه دسته‌های سفید)، همون تعداد واقعی رو اینجا بزن — برای هرکدوم یک ردیف جدا توی انبار ساخته می‌شه.</div>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">قیمت واحد (تومان)</label>
+                <input type="text" inputmode="numeric" id="unitPriceDisplay" class="form-control" placeholder="0" required>
+                <input type="hidden" name="unit_price" id="unitPriceHidden">
+            </div>
+
+            <div class="mb-3 combo">
+                <label class="form-label">نام تأمین‌کننده</label>
+                <input type="text" name="supplier_name" id="supplierInput" class="form-control" placeholder="نام تأمین‌کننده را بنویس یا از لیست انتخاب کن" autocomplete="off">
+                <div class="combo-list" id="supplierList">
+                    {% for s in suppliers %}
+                        <div class="combo-item" data-pick="{{ s.name }}">{{ s.name }}</div>
+                    {% empty %}
+                        <div class="combo-empty">هنوز تأمین‌کننده‌ای ثبت نشده — همینجا تایپ کن، خودکار اضافه می‌شه</div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">نام دریافت‌کننده</label>
+                {% if is_admin %}
+                    <select name="receiver_id" class="form-select">
+                        {% for p in all_personnel_active %}
+                            <option value="{{ p.id }}" {% if active_personnel and active_personnel.id == p.id %}selected{% endif %}>{{ p.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <div class="form-text" style="color:var(--text-faint);">چون دسترسی مدیر داری، می‌تونی هر پرسنلی رو به‌عنوان دریافت‌کننده انتخاب کنی.</div>
+                {% else %}
+                    <input type="text" class="form-control" value="{{ active_personnel.name }}" disabled>
+                    <div class="form-text" style="color:var(--text-faint);">دریافت‌کننده همیشه همون کاربر فعاله؛ فقط مدیر می‌تونه این رو عوض کنه.</div>
+                {% endif %}
+            </div>
+
+            {% if is_admin %}
+                <div class="mb-3 p-3 rounded" style="background:var(--bg); border:1px dashed var(--border);">
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" name="override_datetime" id="overrideDatetime">
+                        <label class="form-check-label" for="overrideDatetime" style="font-size:13px; color:var(--text-dim);">
+                            تغییر دستی تاریخ و ساعت ثبت (فقط مدیر)
+                        </label>
+                    </div>
+                    <div id="datetimeFields" style="display:none;">
+                        <div class="row g-2">
+                            <div class="col-4">
+                                <label class="form-label" style="font-size:11.5px;">سال</label>
+                                <input type="number" name="j_year" class="form-control" value="{{ now_jalali.year }}">
+                            </div>
+                            <div class="col-4">
+                                <label class="form-label" style="font-size:11.5px;">ماه</label>
+                                <input type="number" name="j_month" class="form-control" min="1" max="12" value="{{ now_jalali.month }}">
+                            </div>
+                            <div class="col-4">
+                                <label class="form-label" style="font-size:11.5px;">روز</label>
+                                <input type="number" name="j_day" class="form-control" min="1" max="31" value="{{ now_jalali.day }}">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label" style="font-size:11.5px;">ساعت</label>
+                                <input type="number" name="j_hour" class="form-control" min="0" max="23" value="{{ now_jalali.hour }}">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label" style="font-size:11.5px;">دقیقه</label>
+                                <input type="number" name="j_minute" class="form-control" min="0" max="59" value="{{ now_jalali.minute }}">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+
+            <button type="submit" class="btn btn-gk-primary w-100">ثبت خرید</button>
+        </form>
+    </div>
+</div>
+
+<div class="panel">
+    <div class="panel-head d-flex justify-content-between align-items-center">
+        <span>لیست خریدهای ثبت‌شده</span>
+        <span class="mono" style="font-size:11px; color:var(--text-faint);">{{ recent_purchases|length }} مورد اخیر</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-gk mb-0">
+            <thead>
+                <tr>
+                    <th>سریال</th><th>کالا</th><th>جزئیات</th><th>تعداد</th><th>قیمت واحد (تومان)</th>
+                    <th>تأمین‌کننده</th><th>دریافت‌کننده</th><th>تاریخ و ساعت</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for pur in recent_purchases %}
+                <tr>
+                    <td class="mono">{{ pur.serial_number|default:"—" }}</td>
+                    <td>
+                        {% if pur.accessory %}
+                            {{ pur.accessory.name }}
+                        {% else %}
+                            {{ pur.device_name.name }}
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if pur.accessory %}
+                            {{ pur.accessory.brand.name|default:"" }} {{ pur.accessory.model|default:"" }} {{ pur.accessory.color.name|default:"" }}
+                        {% else %}
+                            {{ pur.device_type.name|default:"—" }}
+                            {% if pur.device_variant %} - سری {{ pur.device_variant.code }}{% endif %}
+                            {% if pur.device_region %} - ریژن {{ pur.device_region.code }}{% endif %}
+                        {% endif %}
+                    </td>
+                    <td class="mono">{{ pur.quantity }}</td>
+                    <td class="mono">{{ pur.unit_price|default:0 }}</td>
+                    <td>{{ pur.supplier.name|default:"—" }}</td>
+                    <td>{{ pur.receiver.name }}</td>
+                    <td class="mono">{{ pur.jalali_datetime }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="8" class="text-center py-4" style="color:var(--text-faint);">هنوز خریدی ثبت نشده</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+// ---- نام دستگاه -> نوع دستگاه -> شماره سری / ریژن (وابسته) ----
+const deviceTypesMap = {{ device_types_json|safe }};
+const deviceVariantsMap = {{ device_variants_json|safe }};
+const devicesWithRegion = {{ devices_with_region_json|safe }};
+const deviceNameSelect = document.getElementById('deviceNameSelect');
+const deviceTypeSelect = document.getElementById('deviceTypeSelect');
+const deviceVariantSelect = document.getElementById('deviceVariantSelect');
+const variantField = document.getElementById('variantField');
+const regionField = document.getElementById('regionField');
+
+function refreshDeviceTypes(){
+    const types = deviceTypesMap[deviceNameSelect.value] || [];
+    if(types.length === 0){
+        deviceTypeSelect.innerHTML = '<option value="">— این دستگاه نوع تعریف‌شده‌ای نداره —</option>';
+    } else {
+        deviceTypeSelect.innerHTML = '<option value="">انتخاب کن...</option>' +
+            types.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+    }
+    deviceVariantSelect.innerHTML = '<option value="">انتخاب کن...</option>';
+    variantField.style.display = 'none';
+    regionField.style.display = devicesWithRegion.includes(Number(deviceNameSelect.value)) ? 'block' : 'none';
+}
+deviceNameSelect.addEventListener('change', refreshDeviceTypes);
+
+deviceTypeSelect.addEventListener('change', function(){
+    const variants = deviceVariantsMap[this.value] || [];
+    if(variants.length){
+        deviceVariantSelect.innerHTML = '<option value="">انتخاب کن...</option>' +
+            variants.map(v => `<option value="${v.id}">${v.code}</option>`).join('');
+        variantField.style.display = 'block';
+    } else {
+        deviceVariantSelect.innerHTML = '<option value="">انتخاب کن...</option>';
+        variantField.style.display = 'none';
+    }
+});
+variantField.style.display = 'none';
+regionField.style.display = 'none';
+
+// ---- تغییر نوع کالا: دستگاه / لوازم جانبی ----
+const itemTypeInput = document.getElementById('itemTypeInput');
+const deviceFieldsDiv = document.getElementById('deviceFieldsDiv');
+const accessoryFieldsDiv = document.getElementById('accessoryFieldsDiv');
+document.querySelectorAll('.item-type-btn').forEach(btn => {
+    btn.addEventListener('click', function(){
+        document.querySelectorAll('.item-type-btn').forEach(b => {
+            b.classList.remove('active');
+            b.style.background = 'var(--panel-2)'; b.style.borderColor = 'var(--border)'; b.style.color = 'var(--text-dim)';
+        });
+        this.classList.add('active');
+        this.style.background = 'var(--teal-dim)'; this.style.borderColor = 'var(--teal)'; this.style.color = 'var(--teal)';
+        itemTypeInput.value = this.dataset.type;
+        if(this.dataset.type === 'device'){
+            deviceFieldsDiv.style.display = 'block';
+            accessoryFieldsDiv.style.display = 'none';
+        } else {
+            deviceFieldsDiv.style.display = 'none';
+            accessoryFieldsDiv.style.display = 'block';
+        }
+    });
+});
+
+// ---- کامبوباکس با فیلتر زنده: با تایپ هر حرف، لیست محدود می‌شه؛ آیتم جدید هم آزادانه قابل تایپه ----
+function wireCombo(inputId, listId){
+    const input = document.getElementById(inputId);
+    const list = document.getElementById(listId);
+    if(!input || !list) return;
+    const allItems = Array.from(list.querySelectorAll('.combo-item')).map(el => el.textContent);
+    const emptyNote = list.querySelector('.combo-empty');
+
+    function render(filterText){
+        const q = (filterText || '').trim().toLowerCase();
+        const matches = q ? allItems.filter(name => name.toLowerCase().includes(q)) : allItems;
+        list.querySelectorAll('.combo-item').forEach(el => el.remove());
+        matches.forEach(name => {
+            const item = document.createElement('div');
+            item.className = 'combo-item';
+            item.dataset.pick = name;
+            item.textContent = name;
+            if(emptyNote){ list.insertBefore(item, emptyNote); } else { list.appendChild(item); }
+        });
+        if(emptyNote){
+            emptyNote.style.display = matches.length ? 'none' : 'block';
+            emptyNote.textContent = q ? 'موردی پیدا نشد — همینو تایپ کن، خودکار به لیست اضافه می‌شه' : emptyNote.dataset.defaultText || emptyNote.textContent;
+        }
+    }
+    if(emptyNote && !emptyNote.dataset.defaultText){ emptyNote.dataset.defaultText = emptyNote.textContent; }
+
+    input.addEventListener('focus', () => { render(input.value); list.classList.add('open'); });
+    input.addEventListener('input', () => { render(input.value); list.classList.add('open'); });
+    list.addEventListener('click', (e) => {
+        const item = e.target.closest('.combo-item');
+        if(item){ input.value = item.dataset.pick; list.classList.remove('open'); }
+    });
+}
+wireCombo('brandInput', 'brandList');
+wireCombo('colorInput', 'colorList');
+wireCombo('supplierInput', 'supplierList');
+wireCombo('accessoryNameInput', 'accessoryNameList');
+
+document.addEventListener('click', (e) => {
+    if(!e.target.closest('.combo')){
+        document.querySelectorAll('.combo-list').forEach(l => l.classList.remove('open'));
+    }
+});
+
+// ---- قیمت با جداکننده سه‌رقمی (تومان) ----
+const priceDisplay = document.getElementById('unitPriceDisplay');
+const priceHidden = document.getElementById('unitPriceHidden');
+priceDisplay.addEventListener('input', function(){
+    const digits = this.value.replace(/[^\d]/g, '');
+    priceHidden.value = digits;
+    this.value = digits ? Number(digits).toLocaleString('en-US') : '';
+});
+document.getElementById('purchaseForm').addEventListener('submit', function(){
+    priceHidden.value = priceDisplay.value.replace(/[^\d]/g, '');
+});
+
+// ---- نمایش/مخفی‌کردن فیلدهای تاریخ دستی (فقط ادمین) ----
+const overrideCheckbox = document.getElementById('overrideDatetime');
+if(overrideCheckbox){
+    overrideCheckbox.addEventListener('change', function(){
+        document.getElementById('datetimeFields').style.display = this.checked ? 'block' : 'none';
+    });
+}
+</script>
+
+<script src="https://unpkg.com/@zxing/library@0.20.0/umd/index.min.js"></script>
+<script>
+// بارکدهایی که سریال واحد نیستن (مثل کد محصول روی جعبه که با P- شروع می‌شه) رد می‌شن
+// و اسکن ادامه پیدا می‌کنه تا بارکد سریال واقعی پیدا بشه.
+function isRejectedSerialBarcode(text){
+    if(!text) return true;
+    return /^P-/i.test(text.trim());
+}
+
+document.getElementById('scanBtn').addEventListener('click', async function(){
+    if(typeof ZXing === 'undefined'){
+        alert('کتابخانه اسکن بارگذاری نشد. اتصال اینترنت گوشی را چک کن و دوباره امتحان کن.');
+        return;
+    }
+
+    const video = document.createElement('video');
+    video.autoplay = true; video.playsInline = true; video.muted = true;
+    video.setAttribute('playsinline', ''); video.setAttribute('webkit-playsinline', ''); video.setAttribute('muted', '');
+    video.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;object-fit:cover;z-index:9999;background:#000;';
+    document.body.appendChild(video);
+
+    const hint = document.createElement('div');
+    hint.textContent = 'بارکد را افقی و نزدیک به دوربین بگیر — برای لغو، تصویر را لمس کن';
+    hint.style.cssText = 'position:fixed;bottom:30px;left:0;right:0;text-align:center;color:#fff;z-index:10000;font-family:Vazirmatn,sans-serif;font-size:14px;padding:0 20px;';
+    document.body.appendChild(hint);
+
+    // فرمت‌های موردنیاز را صریح مشخص می‌کنیم تا بارکدهای خطی (سریال) هم خونده بشن
+    const formats = [
+        ZXing.BarcodeFormat.CODE_128,
+        ZXing.BarcodeFormat.CODE_39,
+        ZXing.BarcodeFormat.EAN_13,
+        ZXing.BarcodeFormat.EAN_8,
+        ZXing.BarcodeFormat.UPC_A,
+        ZXing.BarcodeFormat.UPC_E,
+        ZXing.BarcodeFormat.ITF,
+        ZXing.BarcodeFormat.QR_CODE,
+        ZXing.BarcodeFormat.DATA_MATRIX,
+    ];
+    const hints = new Map();
+    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
+    hints.set(ZXing.DecodeHintType.TRY_HARDER, true); // دقت بالاتر برای بارکدهای خطی، کمی کندتر
+
+    let stopped = false;
+    let codeReader = null;
+    let extraControls = [];
+    let rotateTimer = null;
+
+    const stop = () => {
+        if(stopped) return;
+        stopped = true;
+        try{ if(codeReader) codeReader.reset(); }catch(e){}
+        if(rotateTimer) clearInterval(rotateTimer);
+        video.remove();
+        hint.remove();
+        extraControls.forEach(el => el.remove());
+        extraControls = [];
+    };
+    video.addEventListener('click', stop);
+
+    // هر بار که یه بارکد رد می‌شه، اسکنر رو کامل ری‌استارت می‌کنیم — بعضی مرورگرها/نسخه‌ها
+    // بعد از اولین خوندن (حتی اگه رد بشه) خودکار متوقف می‌شن، پس نمی‌شه فقط return کرد.
+    async function attachAndScan(){
+        if(stopped) return;
+        codeReader = new ZXing.BrowserMultiFormatReader(hints);
+        const onResult = (result, err) => {
+            if(result && !stopped){
+                const text = result.getText();
+                if(isRejectedSerialBarcode(text)){
+                    // بارکد جعبه‌ست، نادیده می‌گیریم و بدون هیچ ری‌استارتی روی همون
+                    // استریم زنده به اسکن ادامه می‌دیم تا سریال واقعی پیدا بشه
+                    return;
+                }
+                document.getElementById('serialInput').value = text;
+                stop();
+            }
+        };
+        // روی سافاری/آیفون، decodeFromConstraints گاهی استریم رو می‌گیره ولی هیچ‌وقت واقعاً
+        // پخش/دیکد نمی‌کنه (بدون هیچ خطایی روی صفحه) — به‌خاطر همین خودمون استریم رو با
+        // getUserMedia می‌گیریم، صریحاً play() می‌کنیم و بعد decodeFromStream رو صدا می‌زنیم.
+        const constraintsOptions = [
+            { video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } } },
+            { video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } } },
+            { video: { facingMode: 'environment' } },
+            { video: true }
+        ];
+        let stream = null;
+        for(const c of constraintsOptions){
+            try{ stream = await navigator.mediaDevices.getUserMedia(c); break; }catch(e){ /* بعدی رو امتحان کن */ }
+        }
+        if(!stream){
+            if(!stopped){
+                stop();
+                alert('دسترسی به دوربین ممکن نشد. مطمئن شو آدرس سایت با https:// باز شده و اجازه دوربین داده‌ای، یا سریال را دستی وارد کن.');
+            }
+            return;
+        }
+        video.srcObject = stream;
+        try{ await video.play(); }catch(e){ /* بعضی نسخه‌های آیفون play() رو رد می‌کنن ولی استریم درست کار می‌کنه */ }
+
+        // فوکوس خودکار پیوسته رو جداگانه و بعد از گرفتن استریم درخواست می‌کنیم — این‌جوری
+        // اگه گوشی/مرورگر پشتیبانی نکنه فقط نادیده گرفته می‌شه و به گرفتن استریم آسیب نمی‌زنه.
+        // بدون این تنظیم، دوربین ممکنه چند ثانیه طول بکشه تا خودش روی بارکد فوکوس کنه.
+        const track = stream.getVideoTracks()[0];
+        try{
+            if(track && track.getCapabilities && track.getCapabilities().focusMode){
+                await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
+            }
+        }catch(e){ /* پشتیبانی نمی‌شه - مشکلی نیست */ }
+
+        // کنترل نور و زوم — برای سریال‌هایی که تو شیار تاریک یا خیلی ریزن (مثل سریال خود کنسول)
+        extraControls.forEach(el => el.remove());
+        extraControls = [];
+        let caps = {};
+        try{ caps = track && track.getCapabilities ? track.getCapabilities() : {}; }catch(e){}
+
+        if(caps.torch){
+            let torchOn = false;
+            const torchBtn = document.createElement('button');
+            torchBtn.type = 'button';
+            torchBtn.textContent = '🔦';
+            torchBtn.style.cssText = 'position:fixed;bottom:90px;left:20px;z-index:10002;width:50px;height:50px;border-radius:50%;border:none;background:rgba(255,255,255,0.2);color:#fff;font-size:22px;';
+            torchBtn.addEventListener('click', async (ev) => {
+                ev.stopPropagation();
+                torchOn = !torchOn;
+                try{ await track.applyConstraints({ advanced: [{ torch: torchOn }] }); }catch(e){}
+                torchBtn.style.background = torchOn ? 'rgba(255,210,0,0.6)' : 'rgba(255,255,255,0.2)';
+            });
+            document.body.appendChild(torchBtn);
+            extraControls.push(torchBtn);
+        }
+
+        if(caps.zoom && caps.zoom.max > caps.zoom.min){
+            let zoomVal = caps.zoom.min;
+            const zoomStep = caps.zoom.step || (caps.zoom.max - caps.zoom.min) / 8 || 0.5;
+            const applyZoom = async (v) => {
+                zoomVal = Math.min(caps.zoom.max, Math.max(caps.zoom.min, v));
+                try{ await track.applyConstraints({ advanced: [{ zoom: zoomVal }] }); }catch(e){}
+            };
+            const zoomOut = document.createElement('button');
+            zoomOut.type = 'button'; zoomOut.textContent = '−';
+            zoomOut.style.cssText = 'position:fixed;bottom:90px;right:80px;z-index:10002;width:50px;height:50px;border-radius:50%;border:none;background:rgba(255,255,255,0.2);color:#fff;font-size:26px;';
+            zoomOut.addEventListener('click', (ev) => { ev.stopPropagation(); applyZoom(zoomVal - zoomStep); });
+            const zoomIn = document.createElement('button');
+            zoomIn.type = 'button'; zoomIn.textContent = '+';
+            zoomIn.style.cssText = 'position:fixed;bottom:90px;right:20px;z-index:10002;width:50px;height:50px;border-radius:50%;border:none;background:rgba(255,255,255,0.2);color:#fff;font-size:22px;';
+            zoomIn.addEventListener('click', (ev) => { ev.stopPropagation(); applyZoom(zoomVal + zoomStep); });
+            document.body.appendChild(zoomOut);
+            document.body.appendChild(zoomIn);
+            extraControls.push(zoomOut, zoomIn);
+        }
+
+        // بعضی بارکدهای سریال (مثل سریال خود کنسول) عمود چاپ شدن، در حالی که کتابخونه‌ی
+        // اسکن پیش‌فرض دنبال بارکد افقی می‌گرده. برای همین جدا از اسکن اصلی، هر نیم‌ثانیه
+        // یه بار فریم رو ۹۰ درجه (به هر دو طرف) می‌چرخونیم و امتحان می‌کنیم.
+        const rotReader = new ZXing.BrowserMultiFormatReader(hints);
+        const rotCanvas = document.createElement('canvas');
+        const rotCtx = rotCanvas.getContext('2d');
+        let rotateDir = 1;
+        rotateTimer = setInterval(() => {
+            if(stopped || !video.videoWidth) return;
+            try{
+                rotCanvas.width = video.videoHeight;
+                rotCanvas.height = video.videoWidth;
+                rotCtx.save();
+                rotCtx.translate(rotCanvas.width / 2, rotCanvas.height / 2);
+                rotCtx.rotate(rotateDir * Math.PI / 2);
+                rotCtx.drawImage(video, -video.videoWidth / 2, -video.videoHeight / 2);
+                rotCtx.restore();
+                const result = rotReader.decodeFromCanvas(rotCanvas);
+                if(result && !stopped){
+                    const text = result.getText();
+                    if(!isRejectedSerialBarcode(text)){
+                        document.getElementById('serialInput').value = text;
+                        stop();
+                        return;
+                    }
+                }
+            }catch(e){ /* چیزی پیدا نشد - عادیه، دفعه‌ی بعد امتحان می‌کنیم */ }
+            rotateDir *= -1; // یک بار ۹۰ درجه به یک طرف، دفعه‌ی بعد به طرف دیگه
+        }, 500);
+
+        try{
+            await codeReader.decodeFromStream(stream, video, onResult);
+        }catch(e){
+            if(!stopped){
+                stop();
+                alert('اسکن با خطا مواجه شد. سریال را دستی وارد کن.');
+            }
+        }
+    }
+    await attachAndScan();
+});
+</script>
+{% endblock %}

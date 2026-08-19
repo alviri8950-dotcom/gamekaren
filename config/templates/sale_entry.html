@@ -24,6 +24,11 @@
                         <input type="text" name="customer_national_id" class="form-control" placeholder="کد ملی مشتری">
                     </div>
                 </div>
+                <div class="form-check mt-3">
+                    <input class="form-check-input" type="checkbox" name="change" id="changeCheck">
+                    <label class="form-check-label" for="changeCheck">تعویض (Change)</label>
+                </div>
+                <div class="form-text" style="color:var(--text-faint);">این گزینه فقط توی نسخهٔ چاپی فروشگاه نشون داده می‌شه، توی نسخهٔ مشتری نمی‌آد.</div>
             </div>
         </div>
 
@@ -60,46 +65,29 @@
             </div>
         </div>
 
-        <div class="form-text mb-2" style="color:var(--text-faint);">
-            روش پرداخت، گزینهٔ تعویض و چاپ رسید فروشگاه، بعد از ثبت این فاکتور، در مرحلهٔ دوم (صفحهٔ فاکتور) انجام می‌شه.
+        <div class="panel mb-3">
+            <div class="panel-head">روش پرداخت</div>
+            <div class="panel-body">
+                <div class="d-flex gap-2 mb-3 flex-wrap">
+                    <button type="button" class="btn btn-sm" id="addPosBtn" style="background:var(--teal-dim); border-color:var(--teal); color:var(--teal);">+ پرداخت پوز</button>
+                    <button type="button" class="btn btn-sm" id="addTransferBtn" style="background:var(--violet-dim); border-color:var(--violet); color:var(--violet);">+ پرداخت انتقالی</button>
+                    <button type="button" class="btn btn-sm" id="addPartyBtn" style="background:var(--copper-dim); border-color:var(--copper); color:var(--copper);">+ فروش نسیه (حساب اشخاص)</button>
+                </div>
+                <div id="paymentRows"></div>
+                <div class="d-flex justify-content-between align-items-center mt-3 p-3 rounded" style="background:var(--bg); border:1px dashed var(--border); font-size:13px;">
+                    <span style="color:var(--text-dim);">جمع پرداخت‌ها</span>
+                    <strong class="mono" id="paidTotal">0 تومان</strong>
+                </div>
+            </div>
         </div>
 
         <div class="d-flex gap-2">
             <button type="button" class="btn btn-ghost flex-grow-1" id="clearBtn">پاک کردن</button>
             <button type="submit" name="action" value="save" class="btn btn-gk-primary flex-grow-1">ثبت</button>
-            <button type="submit" name="action" value="save_print" class="btn btn-gk-primary flex-grow-1" style="flex-grow:2;">🖨️ ثبت و چاپ فاکتور مشتری</button>
+            <button type="submit" name="action" value="save_print" class="btn btn-gk-primary flex-grow-1" style="flex-grow:2;">🖨️ ثبت و چاپ</button>
         </div>
     </form>
 </div>
-
-{% if pending_sales %}
-<div class="panel mt-4" style="border-color:var(--copper);">
-    <div class="panel-head d-flex justify-content-between align-items-center" style="background:var(--copper-dim);">
-        <span>⏳ فاکتورهای در انتظار پرداخت</span>
-        <span class="mono" style="font-size:11px; color:var(--copper);">{{ pending_sales|length }} مورد</span>
-    </div>
-    <div class="table-responsive">
-        <table class="table table-gk mb-0">
-            <thead>
-                <tr><th>شماره</th><th>مشتری</th><th>تلفن</th><th>مبلغ کل</th><th>فروشنده</th><th>تاریخ</th><th></th></tr>
-            </thead>
-            <tbody>
-                {% for s in pending_sales %}
-                <tr>
-                    <td class="mono">#{{ s.id }}</td>
-                    <td>{{ s.customer_name|default:"—" }}</td>
-                    <td class="mono">{{ s.customer_phone|default:"—" }}</td>
-                    <td class="mono">{{ s.total_price }}</td>
-                    <td>{{ s.seller.name }}</td>
-                    <td class="mono">{{ s.jalali_datetime }}</td>
-                    <td><a href="{% url 'sale_print' s.id %}" class="btn btn-sm btn-gk-primary">💳 ثبت پرداخت</a></td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</div>
-{% endif %}
 
 <div class="panel mt-4">
     <div class="panel-head d-flex justify-content-between align-items-center">
@@ -109,7 +97,7 @@
     <div class="table-responsive">
         <table class="table table-gk mb-0">
             <thead>
-                <tr><th>شماره</th><th>مشتری</th><th>تلفن</th><th>مبلغ کل</th><th>وضعیت</th><th>فروشنده</th><th>تاریخ</th><th></th></tr>
+                <tr><th>شماره</th><th>مشتری</th><th>تلفن</th><th>مبلغ کل</th><th>فروشنده</th><th>تاریخ</th><th></th></tr>
             </thead>
             <tbody>
                 {% for s in recent_sales %}
@@ -118,19 +106,12 @@
                     <td>{{ s.customer_name|default:"—" }}</td>
                     <td class="mono">{{ s.customer_phone|default:"—" }}</td>
                     <td class="mono">{{ s.total_price }}</td>
-                    <td>
-                        {% if s.is_finalized %}
-                            <span class="badge" style="background:var(--teal-dim); color:var(--teal);">نهایی‌شده</span>
-                        {% else %}
-                            <span class="badge" style="background:var(--copper-dim); color:var(--copper);">در انتظار پرداخت</span>
-                        {% endif %}
-                    </td>
                     <td>{{ s.seller.name }}</td>
                     <td class="mono">{{ s.jalali_datetime }}</td>
-                    <td><a href="{% url 'sale_print' s.id %}" target="_blank" class="btn btn-sm btn-ghost">مشاهده</a></td>
+                    <td><a href="{% url 'sale_print' s.id %}" target="_blank" class="btn btn-sm btn-ghost">چاپ</a></td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="8" class="text-center py-4" style="color:var(--text-faint);">هنوز فاکتوری ثبت نشده</td></tr>
+                <tr><td colspan="7" class="text-center py-4" style="color:var(--text-faint);">هنوز فاکتوری ثبت نشده</td></tr>
                 {% endfor %}
             </tbody>
         </table>
@@ -144,6 +125,8 @@ const deviceTypesMap = {{ device_types_json|safe }};
 const deviceVariantsMap = {{ device_variants_json|safe }};
 const devicesWithRegion = {{ devices_with_region_json|safe }};
 const deviceRegions = {{ device_regions_json|safe }};
+const bankAccounts = {{ bank_accounts_json|safe }};
+const partyNames = {{ party_names_json|safe }};
 const accessoryNames = {{ accessory_names_json|safe }};
 const accessoryOptionsMap = {{ accessory_options_json|safe }};
 
@@ -382,11 +365,114 @@ function recalcGrandTotal(){
 
 document.getElementById('addItemBtn').addEventListener('click', () => addItemRow());
 
+// ---- پرداخت‌ها ----
+const paymentRows = document.getElementById('paymentRows');
+
+function accountOptionsHtml(){
+    return bankAccounts.map(a => `<option value="${a.id}">${a.label}</option>`).join('');
+}
+
+function addPaymentRow(type){
+    const row = document.createElement('div');
+    row.className = 'row g-2 align-items-end mb-2 p-2 rounded';
+    row.style.cssText = 'background:var(--panel-2); border:1px solid var(--border);';
+    row.dataset.paymentType = type;
+    if(type === 'pos'){
+        row.innerHTML = `
+            <div class="col-3"><span class="badge" style="background:var(--teal-dim); color:var(--teal);">پوز</span></div>
+            <div class="col-md-4 col-5">
+                <label class="form-label" style="font-size:11px;">مبلغ (تومان)</label>
+                <input type="text" inputmode="numeric" class="form-control pay-amount" placeholder="0">
+            </div>
+            <div class="col-md-4 col-5">
+                <label class="form-label" style="font-size:11px;">شماره پیگیری</label>
+                <input type="text" class="form-control pay-tracking" placeholder="شماره پیگیری">
+            </div>
+            <div class="col-1"><button type="button" class="btn btn-sm btn-danger-ghost pay-remove-btn">✕</button></div>
+        `;
+    } else if(type === 'transfer') {
+        row.innerHTML = `
+            <div class="col-3"><span class="badge" style="background:var(--violet-dim); color:var(--violet);">انتقال</span></div>
+            <div class="col-md-3 col-6">
+                <label class="form-label" style="font-size:11px;">حساب مقصد</label>
+                <select class="form-select pay-account">${accountOptionsHtml()}</select>
+            </div>
+            <div class="col-md-2 col-5">
+                <label class="form-label" style="font-size:11px;">مبلغ</label>
+                <input type="text" inputmode="numeric" class="form-control pay-amount" placeholder="0">
+            </div>
+            <div class="col-md-3 col-6">
+                <label class="form-label" style="font-size:11px;">شماره پیگیری</label>
+                <input type="text" class="form-control pay-tracking" placeholder="شماره پیگیری">
+            </div>
+            <div class="col-1"><button type="button" class="btn btn-sm btn-danger-ghost pay-remove-btn">✕</button></div>
+        `;
+    } else {
+        row.innerHTML = `
+            <div class="col-3"><span class="badge" style="background:var(--copper-dim); color:var(--copper);">نسیه</span></div>
+            <div class="col-md-4 col-6 combo">
+                <label class="form-label" style="font-size:11px;">نام شخص</label>
+                <input type="text" class="form-control pay-party-name" placeholder="نام مشتری" autocomplete="off">
+                <div class="combo-list pay-party-list"></div>
+            </div>
+            <div class="col-md-3 col-5">
+                <label class="form-label" style="font-size:11px;">مبلغ</label>
+                <input type="text" inputmode="numeric" class="form-control pay-amount" placeholder="0">
+            </div>
+            <div class="col-1"><button type="button" class="btn btn-sm btn-danger-ghost pay-remove-btn">✕</button></div>
+        `;
+    }
+    paymentRows.appendChild(row);
+    const amountInput = row.querySelector('.pay-amount');
+    amountInput.addEventListener('input', () => {
+        const digits = amountInput.value.replace(/[^\d]/g,'');
+        amountInput.value = digits ? Number(digits).toLocaleString('en-US') : '';
+        recalcPaidTotal();
+    });
+    row.querySelector('.pay-remove-btn').addEventListener('click', () => { row.remove(); recalcPaidTotal(); });
+
+    const partyInput = row.querySelector('.pay-party-name');
+    if(partyInput){
+        const list = row.querySelector('.pay-party-list');
+        const render = (q) => {
+            q = q.trim().toLowerCase();
+            const matches = q ? partyNames.filter(n => n.toLowerCase().includes(q)) : partyNames;
+            list.innerHTML = matches.length
+                ? matches.slice(0, 20).map(n => `<div class="combo-item" data-pick="${n}">${n}</div>`).join('')
+                : '<div class="combo-empty">موردی پیدا نشد — می‌تونی اسم جدید تایپ کنی</div>';
+            list.classList.add('open');
+        };
+        partyInput.addEventListener('focus', () => render(partyInput.value));
+        partyInput.addEventListener('input', () => render(partyInput.value));
+        list.addEventListener('click', (e) => {
+            const item = e.target.closest('.combo-item');
+            if(item && item.dataset.pick){ partyInput.value = item.dataset.pick; list.classList.remove('open'); }
+        });
+        document.addEventListener('click', (e) => {
+            if(!e.target.closest('.combo')) list.classList.remove('open');
+        });
+    }
+}
+
+function recalcPaidTotal(){
+    let p = 0;
+    paymentRows.querySelectorAll('[data-payment-type]').forEach(r => {
+        p += parseNum(r.querySelector('.pay-amount')?.value);
+    });
+    document.getElementById('paidTotal').textContent = fmt(p) + ' تومان';
+}
+
+document.getElementById('addPosBtn').addEventListener('click', () => addPaymentRow('pos'));
+document.getElementById('addTransferBtn').addEventListener('click', () => addPaymentRow('transfer'));
+document.getElementById('addPartyBtn').addEventListener('click', () => addPaymentRow('party_account'));
+
 // ---- پاک کردن فرم ----
 document.getElementById('clearBtn').addEventListener('click', () => {
     itemRows.innerHTML = ''; itemIndex = 0; addItemRow();
+    paymentRows.innerHTML = '';
     document.getElementById('grandTotal').textContent = '0 تومان';
-    document.querySelectorAll('input[type=text], input[type=number]').forEach(i => { if(!i.closest('#itemRows')) i.value=''; });
+    document.getElementById('paidTotal').textContent = '0 تومان';
+    document.querySelectorAll('input[type=text], input[type=number]').forEach(i => { if(!i.closest('#itemRows') && !i.closest('#paymentRows')) i.value=''; });
     document.querySelectorAll('input[type=checkbox]').forEach(c => c.checked = false);
 });
 
@@ -405,6 +491,22 @@ document.getElementById('saleForm').addEventListener('submit', function(e){
             'item_serial[]': r.querySelector('.item-serial')?.value || '',
             'item_qty[]': r.querySelector('.item-qty')?.value || '1',
             'item_price[]': parseNum(r.querySelector('.item-price')?.value),
+        };
+        for(const [name, val] of Object.entries(fields)){
+            const inp = document.createElement('input');
+            inp.type = 'hidden'; inp.name = name; inp.value = val; inp.className = 'hidden-generated';
+            this.appendChild(inp);
+        }
+    });
+
+    paymentRows.querySelectorAll('[data-payment-type]').forEach(r => {
+        const type = r.dataset.paymentType;
+        const fields = {
+            'payment_type[]': type,
+            'payment_amount[]': parseNum(r.querySelector('.pay-amount')?.value),
+            'payment_tracking[]': r.querySelector('.pay-tracking')?.value || '',
+            'payment_account_id[]': type === 'transfer' ? (r.querySelector('.pay-account')?.value || '') : '',
+            'payment_party_name[]': type === 'party_account' ? (r.querySelector('.pay-party-name')?.value || '') : '',
         };
         for(const [name, val] of Object.entries(fields)){
             const inp = document.createElement('input');

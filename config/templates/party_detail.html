@@ -1,0 +1,105 @@
+{% extends 'base.html' %}
+{% load jalali_filters %}
+{% block title %}{{ party.name }} - حساب اشخاص - گیم‌کارن{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <a href="{% url 'parties_list' %}" class="btn btn-sm btn-ghost">→ بازگشت به لیست اشخاص</a>
+    <h1 style="font-size:18px; font-weight:800; margin:0;">{{ party.name }}</h1>
+</div>
+
+<div class="panel mb-3 p-3 text-center">
+    <div style="color:var(--text-faint); font-size:12px;">{{ party.get_kind_display }}</div>
+    <div class="mono" style="font-size:26px; font-weight:800; {% if party.balance > 0 %}color:var(--teal);{% elif party.balance < 0 %}color:var(--danger);{% endif %}">
+        {{ party.balance|commas }} تومان
+    </div>
+    <div style="font-size:13px;">
+        {% if party.balance > 0 %}<span class="badge" style="background:var(--teal-dim); color:var(--teal);">بدهکار — به فروشگاه مدیونه</span>
+        {% elif party.balance < 0 %}<span class="badge" style="background:var(--danger-dim); color:var(--danger);">بستانکار — فروشگاه بهش مدیونه</span>
+        {% else %}<span class="badge" style="background:var(--panel-2); color:var(--text-dim);">تسویه</span>{% endif %}
+    </div>
+</div>
+
+<div class="panel mb-3">
+    <div class="panel-head">ثبت تراکنش برای {{ party.name }}</div>
+    <div class="panel-body">
+        <form method="post" action="{% url 'party_pay' party.id %}" id="payForm">
+            {% csrf_token %}
+            <div class="row g-3 mb-3">
+                <div class="col-md-4">
+                    <label class="form-label">مبلغ (تومان)</label>
+                    <input type="text" inputmode="numeric" id="payAmountDisplay" class="form-control">
+                    <input type="hidden" name="amount" id="payAmountHidden">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">محل</label>
+                    <select name="method" id="payMethodSelect" class="form-select">
+                        <option value="bank">بانک</option>
+                        <option value="transfer">حواله (حساب شخص دیگر)</option>
+                    </select>
+                </div>
+                <div class="col-md-4" id="bankFieldWrap">
+                    <label class="form-label">حساب بانکی</label>
+                    <select name="bank_id" class="form-select">
+                        <option value="">انتخاب کن...</option>
+                        {% for b in banks %}<option value="{{ b.id }}">{{ b.label }} ({{ b.balance|commas }} تومان)</option>{% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4 d-none" id="transferFieldWrap">
+                    <label class="form-label">طرف حواله (نام شخص)</label>
+                    <input type="text" name="source_party_name" class="form-control" placeholder="نام شخص">
+                </div>
+            </div>
+            <div class="d-flex gap-2">
+                <button type="submit" name="direction" value="receive" class="btn btn-gk-primary" style="background:var(--teal); border-color:var(--teal);">دریافت</button>
+                <button type="submit" name="direction" value="pay" class="btn" style="background:var(--danger); border-color:var(--danger); color:#fff;">پرداخت</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="panel">
+    <div class="panel-head">تاریخچه تراکنش‌ها</div>
+    <div class="table-responsive">
+        <table class="table table-gk mb-0">
+            <thead><tr><th>تاریخ</th><th>شرح</th><th>مبلغ</th><th>مانده پس از این</th></tr></thead>
+            <tbody>
+                {% for e in entries %}
+                <tr>
+                    <td class="mono">{{ e.jalali_datetime }}</td>
+                    <td>{{ e.description }}</td>
+                    <td class="mono" style="{% if e.amount > 0 %}color:var(--teal);{% else %}color:var(--danger);{% endif %}">{{ e.amount|commas }}</td>
+                    <td class="mono">{{ e.balance_after|commas }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="4" class="text-center py-4" style="color:var(--text-faint);">هنوز تراکنشی ثبت نشده</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+const payAmountDisplay = document.getElementById('payAmountDisplay');
+const payAmountHidden = document.getElementById('payAmountHidden');
+payAmountDisplay.addEventListener('input', function(){
+    const digits = this.value.replace(/[^\d]/g,'');
+    payAmountHidden.value = digits;
+    this.value = digits ? Number(digits).toLocaleString('en-US') : '';
+});
+document.getElementById('payForm').addEventListener('submit', function(){
+    payAmountHidden.value = payAmountDisplay.value.replace(/[^\d]/g,'');
+});
+
+const methodSelect = document.getElementById('payMethodSelect');
+const bankWrap = document.getElementById('bankFieldWrap');
+const transferWrap = document.getElementById('transferFieldWrap');
+function syncMethodFields(){
+    if(methodSelect.value === 'bank'){ bankWrap.classList.remove('d-none'); transferWrap.classList.add('d-none'); }
+    else { bankWrap.classList.add('d-none'); transferWrap.classList.remove('d-none'); }
+}
+methodSelect.addEventListener('change', syncMethodFields);
+syncMethodFields();
+</script>
+
+{% endblock %}

@@ -1,0 +1,20 @@
+{
+    "name": "گیم کارن",
+    "short_name": "GameKaren",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#FFFFFF",
+    "theme_color": "#E08D4B",
+    "icons": [
+        {
+            "src": "/static/images/img-1587.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "/static/images/img-1587.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        }
+    ]
+}

@@ -562,11 +562,17 @@ def parties_list(request):
     parties = Party.objects.exclude(id__in=capital_party_ids)
     if q:
         parties = parties.filter(name__icontains=q)
-    debtor_total = sum(p.balance for p in parties if p.balance > 0)
-    creditor_total = sum(-p.balance for p in parties if p.balance < 0)
+    parties = list(parties)
+    debtors = sorted([p for p in parties if p.balance > 0], key=lambda p: -p.balance)
+    creditors = sorted([p for p in parties if p.balance < 0], key=lambda p: p.balance)
+    settled = [p for p in parties if p.balance == 0]
+    debtor_total = sum(p.balance for p in debtors)
+    creditor_total = sum(-p.balance for p in creditors)
     all_parties = Party.objects.exclude(id__in=capital_party_ids).values('id', 'name')
     return render(request, 'parties_list.html', {
-        'parties': parties,
+        'debtors': debtors,
+        'creditors': creditors,
+        'settled': settled,
         'q': q,
         'debtor_total': debtor_total,
         'creditor_total': creditor_total,
@@ -837,6 +843,7 @@ def sale_entry(request):
     device_regions = DeviceRegion.objects.filter(is_active=True)
     devices_with_region = list(device_names.filter(has_region=True).values_list('id', flat=True))
     sale_terms = SaleTerm.objects.filter(is_active=True)
+    bank_accounts = BankAccount.objects.filter(is_active=True)
 
     accessories = Accessory.objects.filter(is_active=True).select_related('brand', 'color')
     accessory_names = sorted(set(a.name for a in accessories))
@@ -873,26 +880,26 @@ def sale_entry(request):
                 customer_name=customer_name,
                 customer_phone=customer_phone,
                 customer_national_id=customer_national_id,
+                change=request.POST.get('change') == 'on',
                 seller=active_personnel,
             )
             if term_ids:
                 sale.terms.set(SaleTerm.objects.filter(id__in=term_ids))
 
             _create_sale_line_items_from_post(sale, request)
-            # پرداخت و گزینهٔ تعویض، مرحلهٔ دوم (تکمیل فاکتور) هستن — اینجا فقط خود فاکتور و اقلامش ثبت می‌شه.
+            _create_payments_from_post(sale, request)
 
         action = request.POST.get('action', 'save')
         if action == 'save_print':
-            ok, msg = _print_invoice_copy(sale, 'customer')
+            ok, msg = _print_both_invoice_copies(sale)
             if ok:
                 messages.success(request, f'فاکتور ثبت شد. {msg}')
             else:
                 messages.error(request, f'فاکتور ثبت شد. {msg}')
         else:
-            messages.success(request, 'فاکتور فروش با موفقیت ثبت شد. برای تکمیل، پرداخت را ثبت کن.')
+            messages.success(request, 'فاکتور فروش با موفقیت ثبت شد.')
         return redirect('sale_print', sale_id=sale.id)
 
-    pending_sales = SaleRecord.objects.filter(is_finalized=False, is_voided=False).select_related('seller').prefetch_related('items').order_by('-created_at')
     recent_sales = SaleRecord.objects.select_related('seller').prefetch_related('items', 'payments').all()[:30]
     return render(request, 'sale_entry.html', {
         'device_names_json': json.dumps([{"id": dn.id, "name": dn.name} for dn in device_names], ensure_ascii=False),
@@ -903,7 +910,8 @@ def sale_entry(request):
         'accessory_names_json': json.dumps(accessory_names, ensure_ascii=False),
         'accessory_options_json': json.dumps(accessory_options_map, ensure_ascii=False),
         'sale_terms': sale_terms,
-        'pending_sales': pending_sales,
+        'bank_accounts_json': json.dumps([{"id": a.id, "label": a.label} for a in bank_accounts], ensure_ascii=False),
+        'party_names_json': json.dumps(list(Party.objects.values_list('name', flat=True)), ensure_ascii=False),
         'recent_sales': recent_sales,
     })
 
@@ -913,26 +921,31 @@ def sale_print(request, sale_id):
     if not sale:
         messages.error(request, 'این فاکتور پیدا نشد.')
         return redirect('game_sales_invoice')
-
-    bank_accounts = BankAccount.objects.filter(is_active=True)
-    return render(request, 'sale_print.html', {
-        'sale': sale,
-        'bank_accounts_json': json.dumps([{"id": a.id, "label": a.label} for a in bank_accounts], ensure_ascii=False),
-        'party_names_json': json.dumps(list(Party.objects.values_list('name', flat=True)), ensure_ascii=False),
-    })
+    return render(request, 'sale_print.html', {'sale': sale})
 
 
-def _print_invoice_copy(sale, copy_type):
-    """یک نسخهٔ فاکتور (customer یا store) رو به‌صورت PDF (اندازه A5) به پرینتر می‌فرسته.
-    خروجی: (ok, پیام)."""
-    label = 'مشتری' if copy_type == 'customer' else 'فروشگاه'
-    path, err = build_invoice_pdf(sale, copy_type)
-    if err:
-        return False, f"ساخت PDF نسخهٔ {label} شکست خورد: {err}"
-    ok, msg = send_pdf_to_default_printer(path)
-    if ok:
-        return True, f"نسخهٔ {label} فاکتور به پرینتر فرستاده شد."
-    return False, f"چاپ نسخهٔ {label} انجام نشد: {msg}"
+def _print_both_invoice_copies(sale):
+    """هر دو نسخه (مشتری و فروشگاه) رو به‌صورت PDF (اندازه A5) به پرینتر می‌فرسته. خروجی: (ok, پیام).
+    نسخهٔ مشتری همیشه اول فرستاده می‌شه؛ چون os.startfile ناهمزمانه (فقط برنامه رو باز می‌کنه
+    و منتظر چاپ واقعی نمی‌مونه)، چند ثانیه صبر می‌کنیم تا نسخهٔ مشتری واقعاً وارد صف پرینتر بشه،
+    بعد نسخهٔ فروشگاه رو می‌فرستیم — تا نوبت چاپ‌شون هیچ‌وقت جابه‌جا نشه."""
+    path1, err1 = build_invoice_pdf(sale, 'customer')
+    if err1:
+        return False, f"ساخت PDF نسخهٔ مشتری شکست خورد: {err1}"
+    path2, err2 = build_invoice_pdf(sale, 'store')
+    if err2:
+        return False, f"ساخت PDF نسخهٔ فروشگاه شکست خورد: {err2}"
+
+    ok1, msg1 = send_pdf_to_default_printer(path1)
+    time.sleep(4)  # فرصت کافی برای باز شدن PDF و رسیدن واقعی به صف پرینتر، قبل از ارسال نسخهٔ بعدی
+    ok2, msg2 = send_pdf_to_default_printer(path2)
+    if ok1 and ok2:
+        return True, "هر دو نسخهٔ فاکتور (مشتری و فروشگاه) به پرینتر فرستاده شد."
+    if ok1 and not ok2:
+        return False, f"نسخهٔ مشتری چاپ شد، ولی نسخهٔ فروشگاه چاپ نشد: {msg2}"
+    if ok2 and not ok1:
+        return False, f"نسخهٔ فروشگاه چاپ شد، ولی نسخهٔ مشتری چاپ نشد: {msg1}"
+    return False, f"چاپ هیچ‌کدوم از دو نسخه انجام نشد: {msg1}"
 
 
 def sale_print_to_printer(request, sale_id):
@@ -941,48 +954,11 @@ def sale_print_to_printer(request, sale_id):
         messages.error(request, 'این فاکتور پیدا نشد.')
         return redirect('game_sales_invoice')
 
-    # قبل از نهایی‌شدن (مرحله پرداخت)، نسخهٔ مشتری؛ بعد از نهایی‌شدن، نسخهٔ فروشگاه چاپ می‌شه.
-    copy_type = 'store' if sale.is_finalized else 'customer'
-    ok, msg = _print_invoice_copy(sale, copy_type)
+    ok, msg = _print_both_invoice_copies(sale)
     if ok:
         messages.success(request, msg)
     else:
         messages.error(request, msg)
-    return redirect('sale_print', sale_id=sale.id)
-
-
-@require_POST
-def sale_finalize(request, sale_id):
-    """مرحلهٔ دوم فاکتور فروش: ثبت پرداخت‌ها و گزینهٔ تعویض، نهایی‌کردن فاکتور و چاپ رسید فروشگاه."""
-    sale = SaleRecord.objects.prefetch_related('items', 'payments').filter(id=sale_id).first()
-    if not sale:
-        messages.error(request, 'این فاکتور پیدا نشد.')
-        return redirect('game_sales_invoice')
-    if sale.is_voided:
-        messages.error(request, 'فاکتور ابطال‌شده قابل تکمیل نیست.')
-        return redirect('sale_print', sale_id=sale.id)
-    if sale.is_finalized:
-        messages.error(request, 'این فاکتور قبلاً نهایی شده است.')
-        return redirect('sale_print', sale_id=sale.id)
-
-    active_id = request.session.get('active_personnel_id')
-    active_personnel = Personnel.objects.filter(id=active_id, is_active=True).first() if active_id else None
-    if not active_personnel:
-        messages.error(request, 'اول باید «کاربر فعال» را از بالای صفحه انتخاب کنی.')
-        return redirect('sale_print', sale_id=sale.id)
-
-    with transaction.atomic():
-        sale.change = request.POST.get('change') == 'on'
-        sale.is_finalized = True
-        sale.finalized_at = timezone.now()
-        sale.save(update_fields=['change', 'is_finalized', 'finalized_at'])
-        _create_payments_from_post(sale, request)
-
-    ok, msg = _print_invoice_copy(sale, 'store')
-    if ok:
-        messages.success(request, f'پرداخت ثبت و فاکتور نهایی شد. {msg}')
-    else:
-        messages.error(request, f'پرداخت ثبت و فاکتور نهایی شد، ولی {msg}')
     return redirect('sale_print', sale_id=sale.id)
 
 

@@ -295,13 +295,12 @@ def build_invoice_pdf(sale, copy_type):
         pdf.set_xy(MARGIN_L, y)
         pdf.cell(usable_w, 6, rtl('شرایط پرداخت‌ها:'), align='R')
         y += 6
-        payments = list(sale.payments.select_related('bank_account', 'party').all())
+        payments = list(sale.payments.all())
         if payments:
             for p in payments:
                 acc = f" - {p.bank_account.label}" if p.bank_account else ""
-                party_name = f" - {p.party.name}" if p.party else ""
                 tracking = f" (پیگیری: {p.tracking_number})" if p.tracking_number else ""
-                line = f"{p.get_payment_type_display()}{acc}{party_name}: {p.amount:,} تومان{tracking}"
+                line = f"{p.get_payment_type_display()}{acc}: {p.amount:,} تومان{tracking}"
                 pdf.set_xy(MARGIN_L, y)
                 pdf.cell(usable_w, 6, rtl(line), align='R')
                 y += 6

@@ -1,0 +1,172 @@
+{% extends 'base.html' %}
+{% block title %}هزینه - گیم‌کارن{% endblock %}
+{% block content %}
+
+<div style="max-width:640px; margin:0 auto;">
+{% if not active_personnel %}
+<div class="mb-3 p-3 rounded" style="background:var(--copper-dim); border:1px solid var(--copper); color:var(--copper); font-size:13px;">
+    برای ثبت هزینه، اول از بالای صفحه «کاربر فعال» رو انتخاب کن.
+</div>
+{% endif %}
+
+<form method="post" id="expenseForm">
+    {% csrf_token %}
+    <div class="panel mb-3">
+        <div class="panel-head">ثبت هزینه</div>
+        <div class="panel-body">
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-6 combo">
+                    <label class="form-label">عنوان هزینه</label>
+                    <input type="text" name="category" id="categoryInput" class="form-control" placeholder="مثلاً حقوق، اجاره، قبض..." autocomplete="off" required>
+                    <div class="combo-list" id="categoryList"></div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">مبلغ (تومان)</label>
+                    <input type="text" inputmode="numeric" id="amountDisplay" class="form-control">
+                    <input type="hidden" name="amount" id="amountHidden">
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3 d-none" id="salaryFields">
+                <div class="col-md-6">
+                    <label class="form-label">نام پرسنل</label>
+                    <select name="personnel_id" class="form-select">
+                        <option value="">انتخاب کن...</option>
+                        {% for p in personnel_list %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">ماه حقوق (شمسی)</label>
+                    <input type="text" name="salary_month" class="form-control" placeholder="مثلاً مرداد ۱۴۰۴">
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3 d-none combo" id="billFields">
+                <div class="col-12">
+                    <label class="form-label">نوع قبض</label>
+                    <input type="text" name="subcategory" id="subcategoryInput" class="form-control" placeholder="مثلاً برق، آب، بیمه..." autocomplete="off">
+                    <div class="combo-list" id="subcategoryList"></div>
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">توضیحات (اختیاری)</label>
+                <input type="text" name="note" class="form-control" placeholder="توضیح کوتاه">
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                    <label class="form-label">محل پرداخت</label>
+                    <select name="payment_method" id="methodSelect" class="form-select">
+                        <option value="bank">از بانک</option>
+                        <option value="party">حساب اشخاص (بستانکار)</option>
+                    </select>
+                </div>
+                <div class="col-md-6" id="bankFieldWrap">
+                    <label class="form-label">حساب بانکی</label>
+                    <select name="bank_id" class="form-select">
+                        <option value="">انتخاب کن...</option>
+                        {% for b in banks %}<option value="{{ b.id }}">{{ b.label }} ({{ b.balance }} تومان)</option>{% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-6 d-none" id="partyFieldWrap">
+                    <label class="form-label">نام شخص</label>
+                    <input type="text" name="party_name" class="form-control" placeholder="نام شخص">
+                </div>
+            </div>
+
+            <div class="form-text mb-2" style="color:var(--text-faint);">تاریخ/ساعت و ثبت‌کننده خودکار با لحظه‌ی ثبت و کاربر فعال پر می‌شه.</div>
+            <button type="submit" class="btn btn-gk-primary w-100">+ ثبت هزینه</button>
+        </div>
+    </div>
+</form>
+</div>
+
+<div class="panel">
+    <div class="panel-head">هزینه‌های اخیر</div>
+    <div class="table-responsive">
+        <table class="table table-gk mb-0">
+            <thead><tr><th>عنوان</th><th>توضیح</th><th>مبلغ</th><th>محل پرداخت</th><th>ثبت‌کننده</th><th>تاریخ</th><th>وضعیت</th><th></th></tr></thead>
+            <tbody>
+                {% for e in recent_expenses %}
+                <tr{% if e.is_voided %} style="opacity:.55;"{% endif %}>
+                    <td>{{ e.category }}{% if e.subcategory %} ({{ e.subcategory }}){% endif %}{% if e.personnel %} — {{ e.personnel.name }}{% if e.salary_month %} ({{ e.salary_month }}){% endif %}{% endif %}</td>
+                    <td>{{ e.note|default:"—" }}</td>
+                    <td class="mono">{{ e.amount }}</td>
+                    <td>{% if e.payment_method == 'bank' %}بانک: {{ e.bank_account.label|default:"—" }}{% else %}شخص: {{ e.party.name|default:"—" }}{% endif %}</td>
+                    <td>{{ e.created_by.name }}</td>
+                    <td class="mono">{{ e.jalali_datetime }}</td>
+                    <td>{% if e.is_voided %}<span class="badge" style="background:var(--danger-dim); color:var(--danger);">ابطال‌شده</span>{% else %}<span class="badge" style="background:var(--teal-dim); color:var(--teal);">فعال</span>{% endif %}</td>
+                    <td>
+                        {% if not e.is_voided %}
+                        <form method="post" action="{% url 'expense_void' e.id %}" onsubmit="return confirm('این هزینه ابطال شود؟');">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-sm" style="background:var(--danger-dim); color:var(--danger); border:none;">ابطال</button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}<tr><td colspan="8" class="text-center py-4" style="color:var(--text-faint);">هنوز هزینه‌ای ثبت نشده</td></tr>{% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+const categories = {{ categories_json|safe }};
+const subcategories = {{ subcategories_json|safe }};
+
+function wireFilterCombo(inputId, listId, items, onPick){
+    const input = document.getElementById(inputId);
+    const list = document.getElementById(listId);
+    function render(q){
+        q = (q || '').trim().toLowerCase();
+        const matches = q ? items.filter(n => n.toLowerCase().includes(q)) : items;
+        list.innerHTML = matches.length
+            ? matches.map(n => `<div class="combo-item" data-pick="${n}">${n}</div>`).join('')
+            : '<div class="combo-empty">موردی نیست — می‌تونی یه اسم جدید تایپ کنی</div>';
+        list.classList.add('open');
+    }
+    input.addEventListener('focus', () => render(input.value));
+    input.addEventListener('input', () => { render(input.value); if(onPick) onPick(input.value); });
+    list.addEventListener('click', (e) => {
+        const item = e.target.closest('.combo-item');
+        if(item){ input.value = item.dataset.pick; list.classList.remove('open'); if(onPick) onPick(input.value); }
+    });
+    document.addEventListener('click', (e) => { if(!e.target.closest('.combo')) list.classList.remove('open'); });
+}
+
+const salaryFields = document.getElementById('salaryFields');
+const billFields = document.getElementById('billFields');
+function syncCategoryFields(val){
+    salaryFields.classList.toggle('d-none', val !== 'حقوق');
+    billFields.classList.toggle('d-none', val !== 'قبض');
+}
+wireFilterCombo('categoryInput', 'categoryList', categories, syncCategoryFields);
+wireFilterCombo('subcategoryInput', 'subcategoryList', subcategories);
+syncCategoryFields(document.getElementById('categoryInput').value);
+
+const amountDisplay = document.getElementById('amountDisplay');
+const amountHidden = document.getElementById('amountHidden');
+amountDisplay.addEventListener('input', function(){
+    const digits = this.value.replace(/[^\d]/g,'');
+    amountHidden.value = digits;
+    this.value = digits ? Number(digits).toLocaleString('en-US') : '';
+});
+document.getElementById('expenseForm').addEventListener('submit', function(){
+    amountHidden.value = amountDisplay.value.replace(/[^\d]/g,'');
+});
+
+const methodSelect = document.getElementById('methodSelect');
+const bankWrap = document.getElementById('bankFieldWrap');
+const partyWrap = document.getElementById('partyFieldWrap');
+function syncMethodFields(){
+    if(methodSelect.value === 'bank'){ bankWrap.classList.remove('d-none'); partyWrap.classList.add('d-none'); }
+    else { bankWrap.classList.add('d-none'); partyWrap.classList.remove('d-none'); }
+}
+methodSelect.addEventListener('change', syncMethodFields);
+syncMethodFields();
+</script>
+
+{% endblock %}

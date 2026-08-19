@@ -1,0 +1,181 @@
+{% extends 'base.html' %}
+{% load jalali_filters %}
+{% block title %}حساب اشخاص - گیم‌کارن{% endblock %}
+{% block content %}
+
+<!-- parties_list-layout-v2 -->
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <h1 style="font-size:18px; font-weight:800; margin:0;">حساب اشخاص</h1>
+    <form method="get" class="d-flex gap-1 combo" id="partySearchForm">
+        <div style="position:relative; min-width:200px;">
+            <input type="text" name="q" id="partySearchInput" class="form-control form-control-sm" placeholder="جستجوی نام..." value="{{ q }}" autocomplete="off">
+            <div class="combo-list" id="partySearchList"></div>
+        </div>
+        <button type="submit" class="btn btn-sm btn-gk-primary">جستجو</button>
+    </form>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-md-6">
+        <div class="panel p-3">
+            <div style="color:var(--text-faint); font-size:12px;">مجموع بدهکاران (به ما مدیون‌اند)</div>
+            <div class="mono" style="font-size:20px; font-weight:800; color:var(--teal);">{{ debtor_total|commas }} تومان</div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="panel p-3">
+            <div style="color:var(--text-faint); font-size:12px;">مجموع بستانکاران (ما مدیونیم)</div>
+            <div class="mono" style="font-size:20px; font-weight:800; color:var(--danger);">{{ creditor_total|commas }} تومان</div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-12">
+        <div class="panel p-3">
+            <div style="color:var(--text-faint); font-size:12px;">سرمایه (جمع موجودی کالا + جمع موجودی اولیه)</div>
+            <div class="mono" style="font-size:20px; font-weight:800; color:var(--teal);">{{ capital_summary.capital_total|commas }} تومان</div>
+            <div style="color:var(--text-faint); font-size:11px; margin-top:4px;">
+                موجودی کالا: {{ capital_summary.inventory_value|commas }} تومان — موجودی اولیه: {{ capital_summary.capital_balance|commas }} تومان
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="panel mb-3" data-print-scope="banks">
+    <div class="panel-head d-flex justify-content-between align-items-center">
+        <span>بانک‌ها</span>
+        <button type="button" class="btn btn-sm btn-ghost no-print" onclick="printSection('banks')">🖨️ پرینت بانک‌ها</button>
+    </div>
+    <div class="p-2">
+        <div class="row row-cols-2 row-cols-md-3 row-cols-lg-4 g-2">
+            {% for b in banks %}
+            <div class="col">
+                <div style="border:1px solid var(--panel-2); border-radius:8px; padding:8px 10px;">
+                    <div style="color:var(--text-faint); font-size:11px;">{{ b.label }}</div>
+                    <div class="mono" style="font-size:14px; font-weight:700;">{{ b.balance|commas }} تومان</div>
+                </div>
+            </div>
+            {% empty %}
+            <div class="col-12 text-center py-3" style="color:var(--text-faint);">حساب بانکی‌ای ثبت نشده</div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-md-6" data-print-scope="debtors">
+        <div class="panel">
+            <div class="panel-head d-flex justify-content-between align-items-center">
+                <span>بدهکاران <span class="mono" style="color:var(--text-faint); font-size:11px;">({{ debtors|length }} نفر)</span></span>
+                <button type="button" class="btn btn-sm btn-ghost no-print" onclick="printSection('debtors')">🖨️ پرینت بدهکاران</button>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-gk mb-0">
+                    <thead><tr><th>نام</th><th>نوع</th><th>مانده حساب</th><th class="no-print"></th></tr></thead>
+                    <tbody>
+                        {% for p in debtors %}
+                        <tr>
+                            <td>{{ p.name }}</td>
+                            <td>{{ p.get_kind_display }}</td>
+                            <td class="mono" style="color:var(--teal);">{{ p.balance|commas }}</td>
+                            <td class="no-print"><a href="{% url 'party_detail' p.id %}" class="btn btn-sm btn-ghost">مشاهده</a></td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="4" class="text-center py-4" style="color:var(--text-faint);">بدهکاری پیدا نشد</td></tr>
+                        {% endfor %}
+                    </tbody>
+                    {% if debtors %}<tfoot><tr><th colspan="2">جمع</th><th class="mono">{{ debtor_total|commas }}</th><th class="no-print"></th></tr></tfoot>{% endif %}
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6" data-print-scope="creditors">
+        <div class="panel">
+            <div class="panel-head d-flex justify-content-between align-items-center">
+                <span>بستانکاران <span class="mono" style="color:var(--text-faint); font-size:11px;">({{ creditors|length }} نفر)</span></span>
+                <button type="button" class="btn btn-sm btn-ghost no-print" onclick="printSection('creditors')">🖨️ پرینت بستانکاران</button>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-gk mb-0">
+                    <thead><tr><th>نام</th><th>نوع</th><th>مانده حساب</th><th class="no-print"></th></tr></thead>
+                    <tbody>
+                        {% for p in creditors %}
+                        <tr>
+                            <td>{{ p.name }}</td>
+                            <td>{{ p.get_kind_display }}</td>
+                            <td class="mono" style="color:var(--danger);">{{ p.balance|cut:"-"|commas }}</td>
+                            <td class="no-print"><a href="{% url 'party_detail' p.id %}" class="btn btn-sm btn-ghost">مشاهده</a></td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="4" class="text-center py-4" style="color:var(--text-faint);">بستانکاری پیدا نشد</td></tr>
+                        {% endfor %}
+                    </tbody>
+                    {% if creditors %}<tfoot><tr><th colspan="2">جمع</th><th class="mono">{{ creditor_total|commas }}</th><th class="no-print"></th></tr></tfoot>{% endif %}
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if settled %}
+<div class="panel mt-3 no-print">
+    <div class="panel-head">تسویه‌شده</div>
+    <div class="table-responsive">
+        <table class="table table-gk mb-0">
+            <thead><tr><th>نام</th><th>نوع</th><th></th></tr></thead>
+            <tbody>
+                {% for p in settled %}
+                <tr><td>{{ p.name }}</td><td>{{ p.get_kind_display }}</td><td><a href="{% url 'party_detail' p.id %}" class="btn btn-sm btn-ghost">مشاهده</a></td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<style>
+@media print {
+    .navbar-gk, .no-print { display:none !important; }
+    body.print-scope-banks [data-print-scope]:not([data-print-scope="banks"]) { display:none !important; }
+    body.print-scope-debtors [data-print-scope]:not([data-print-scope="debtors"]) { display:none !important; }
+    body.print-scope-creditors [data-print-scope]:not([data-print-scope="creditors"]) { display:none !important; }
+}
+</style>
+
+<script>
+const allParties = {{ all_parties_json|safe }};
+const partyDetailUrlTemplate = "{% url 'party_detail' 999999 %}";
+const searchInput = document.getElementById('partySearchInput');
+const searchList = document.getElementById('partySearchList');
+
+function renderPartyOptions(q){
+    q = q.trim().toLowerCase();
+    const matches = q ? allParties.filter(p => p.name.toLowerCase().includes(q)) : allParties;
+    searchList.innerHTML = matches.length
+        ? matches.slice(0, 30).map(p => `<div class="combo-item" data-id="${p.id}" data-name="${p.name}">${p.name}</div>`).join('')
+        : '<div class="combo-empty">شخصی با این اسم پیدا نشد</div>';
+    searchList.classList.add('open');
+}
+searchInput.addEventListener('focus', () => renderPartyOptions(searchInput.value));
+searchInput.addEventListener('input', () => renderPartyOptions(searchInput.value));
+searchList.addEventListener('click', (e) => {
+    const item = e.target.closest('.combo-item');
+    if(item && item.dataset.id){
+        window.location.href = partyDetailUrlTemplate.replace('999999', item.dataset.id);
+    }
+});
+document.addEventListener('click', (e) => {
+    if(!e.target.closest('.combo')) searchList.classList.remove('open');
+});
+
+function printSection(scope){
+    document.body.classList.add('print-scope-' + scope);
+    window.print();
+}
+window.addEventListener('afterprint', () => {
+    document.body.classList.remove('print-scope-banks', 'print-scope-debtors', 'print-scope-creditors');
+});
+</script>
+
+{% endblock %}

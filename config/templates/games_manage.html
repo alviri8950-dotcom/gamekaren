@@ -1,0 +1,87 @@
+{% extends 'base.html' %}
+{% block title %}بازی‌ها - گیم‌کارن{% endblock %}
+{% block content %}
+
+<div class="panel mb-4">
+    <div class="panel-head">{% if editing_game %}ویرایش بازی: {{ editing_game.name }}{% else %}افزودن بازی جدید{% endif %}</div>
+    <div class="panel-body">
+        <form method="post">
+            {% csrf_token %}
+            {% if editing_game %}<input type="hidden" name="game_id" value="{{ editing_game.id }}">{% endif %}
+
+            <div class="mb-3">
+                <label class="form-label">نام بازی</label>
+                <input type="text" name="name" class="form-control" value="{{ editing_game.name|default:'' }}" placeholder="مثلاً EA FC 25" required>
+            </div>
+
+            <label class="form-label">در دسترس روی این دستگاه‌ها (لایسنس / کپی)</label>
+            <div class="table-responsive mb-3">
+                <table class="table table-gk mb-0">
+                    <thead><tr><th>دستگاه</th><th>لایسنس</th><th>کپی</th></tr></thead>
+                    <tbody>
+                        {% for dn in device_names %}
+                        <tr>
+                            <td>{{ dn.name }}</td>
+                            <td><input type="checkbox" name="availability[]" value="{{ dn.id }}:license"
+                                {% for pair in editing_availability %}{% if pair.0 == dn.id and pair.1 == "license" %}checked{% endif %}{% endfor %}></td>
+                            <td><input type="checkbox" name="availability[]" value="{{ dn.id }}:copy"
+                                {% for pair in editing_availability %}{% if pair.0 == dn.id and pair.1 == "copy" %}checked{% endif %}{% endfor %}></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-gk-primary flex-grow-1">{% if editing_game %}ذخیره تغییرات{% else %}+ افزودن بازی{% endif %}</button>
+                {% if editing_game %}<a href="{% url 'games_manage' %}" class="btn btn-ghost">انصراف</a>{% endif %}
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="panel">
+    <div class="panel-head d-flex justify-content-between align-items-center">
+        <span>لیست بازی‌ها</span>
+        <span class="mono" style="font-size:11px; color:var(--text-faint);">{{ games|length }} عنوان</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-gk mb-0">
+            <thead><tr><th>نام</th><th>در دسترس روی</th><th>وضعیت</th><th></th></tr></thead>
+            <tbody>
+                {% for g in games %}
+                <tr>
+                    <td>{{ g.name }}</td>
+                    <td style="font-size:12px; color:var(--text-dim);">
+                        {% for a in g.availabilities.all %}
+                            <span class="badge" style="background:var(--panel-2); color:var(--text-dim); margin-left:3px;">{{ a.device_name.name }} ({{ a.get_license_type_display }})</span>
+                        {% empty %}—{% endfor %}
+                    </td>
+                    <td>
+                        {% if g.is_active %}<span class="badge" style="background:var(--teal-dim); color:var(--teal);">فعال</span>
+                        {% else %}<span class="badge" style="background:var(--danger-dim); color:var(--danger);">غیرفعال</span>{% endif %}
+                    </td>
+                    <td class="d-flex gap-1">
+                        <a href="?edit={{ g.id }}" class="btn btn-sm btn-ghost">ویرایش</a>
+                        <form method="post" style="display:inline;">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="toggle_active">
+                            <input type="hidden" name="game_id" value="{{ g.id }}">
+                            <button type="submit" class="btn btn-sm btn-ghost">{% if g.is_active %}غیرفعال کن{% else %}فعال کن{% endif %}</button>
+                        </form>
+                        <form method="post" style="display:inline;" onsubmit="return confirm('این بازی حذف شود؟');">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="delete">
+                            <input type="hidden" name="game_id" value="{{ g.id }}">
+                            <button type="submit" class="btn btn-sm btn-danger-ghost">حذف</button>
+                        </form>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="4" class="text-center py-4" style="color:var(--text-faint);">هنوز بازی‌ای ثبت نشده</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

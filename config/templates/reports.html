@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+{% block title %}گزارشات - گیم‌کارن{% endblock %}
+{% block content %}
+
+<div style="max-width:520px; margin:0 auto;" class="d-grid gap-3">
+    <a href="{% url 'report_detail' 'sales' %}" class="panel d-flex align-items-center gap-3 text-decoration-none" style="color:var(--text); padding:20px 22px;">
+        <span style="font-size:32px;">🧾</span>
+        <span style="font-size:17px; font-weight:700;">فاکتورهای فروش</span>
+    </a>
+    <a href="{% url 'report_detail' 'purchases' %}" class="panel d-flex align-items-center gap-3 text-decoration-none" style="color:var(--text); padding:20px 22px;">
+        <span style="font-size:32px;">🛒</span>
+        <span style="font-size:17px; font-weight:700;">خریدها</span>
+    </a>
+    <a href="{% url 'report_detail' 'banks' %}" class="panel d-flex align-items-center gap-3 text-decoration-none" style="color:var(--text); padding:20px 22px;">
+        <span style="font-size:32px;">🏦</span>
+        <span style="font-size:17px; font-weight:700;">بانک‌ها</span>
+    </a>
+    <a href="{% url 'report_detail' 'inventory' %}" class="panel d-flex align-items-center gap-3 text-decoration-none" style="color:var(--text); padding:20px 22px;">
+        <span style="font-size:32px;">📦</span>
+        <span style="font-size:17px; font-weight:700;">موجودی کالا</span>
+    </a>
+    <a href="{% url 'report_detail' 'installs' %}" class="panel d-flex align-items-center gap-3 text-decoration-none" style="color:var(--text); padding:20px 22px;">
+        <span style="font-size:32px;">🎮</span>
+        <span style="font-size:17px; font-weight:700;">نصب بازی</span>
+    </a>
+    <a href="{% url 'report_detail' 'profit' %}" class="panel d-flex align-items-center gap-3 text-decoration-none" style="color:var(--text); padding:20px 22px;">
+        <span style="font-size:32px;">💰</span>
+        <span style="font-size:17px; font-weight:700;">سود و زیان</span>
+    </a>
+</div>
+
+{% endblock %}

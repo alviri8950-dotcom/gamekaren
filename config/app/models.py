@@ -383,9 +383,6 @@ class SaleRecord(models.Model):
     terms = models.ManyToManyField(SaleTerm, verbose_name="شرایط فروش", blank=True, related_name="sales")
     change = models.BooleanField("تعویض (Change)", default=False)
 
-    is_finalized = models.BooleanField("نهایی‌شده (پرداخت ثبت و رسید فروشگاه چاپ شده)", default=False)
-    finalized_at = models.DateTimeField("تاریخ نهایی‌شدن", null=True, blank=True)
-
     seller = models.ForeignKey(
         Personnel, verbose_name="فروشنده", on_delete=models.PROTECT, related_name="sales_made"
     )

@@ -1,0 +1,161 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}گیم‌کارن | مدیریت فروشگاه{% endblock %}</title>
+    <link rel="icon" href="{% static 'images/app-icon.jpeg' %}">
+    <link rel="apple-touch-icon" href="{% static 'images/app-icon.jpeg' %}">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="manifest" href="/static/manifest.json">
+    <style>
+        :root{
+            --bg:#EEF1F5; --panel:#FFFFFF; --panel-2:#F4F6F9; --border:#DDE2E9;
+            --text:#161B26; --text-dim:#555F73; --text-faint:#8B93A6;
+            --copper:#D97B3F; --copper-dim:#FBEADC; --copper-deep:#B8611F;
+            --teal:#1F8F82; --teal-dim:#E1F4F1;
+            --violet:#6E62BE; --violet-dim:#ECEAFA;
+            --success:#279457; --danger:#D0453F; --danger-dim:#FBE7E6;
+            --shadow-sm:0 1px 2px rgba(15,20,30,.05), 0 1px 1px rgba(15,20,30,.04);
+            --shadow-md:0 4px 14px rgba(15,20,30,.08), 0 1px 3px rgba(15,20,30,.05);
+            --shadow-lg:0 10px 30px rgba(15,20,30,.12);
+        }
+        *{box-sizing:border-box;}
+        body{ background:var(--bg); color:var(--text); font-family:'Vazirmatn',sans-serif; min-height:100vh; -webkit-font-smoothing:antialiased; }
+        .mono{ font-family:'JetBrains Mono',monospace; font-variant-numeric:tabular-nums; }
+        a{ color:var(--teal); }
+        h1,h2,h3{ letter-spacing:-.01em; }
+
+        .navbar-gk{
+            background:rgba(255,255,255,.92); backdrop-filter:blur(8px); border-bottom:1px solid var(--border);
+            padding:11px 20px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;
+            box-shadow:var(--shadow-sm); position:sticky; top:0; z-index:50;
+        }
+        .brand{ display:flex; align-items:center; gap:10px; text-decoration:none; flex-shrink:0; }
+        .brand-mark{ width:34px; height:34px; border-radius:9px; overflow:hidden; flex-shrink:0; box-shadow:0 0 0 2px var(--panel), 0 0 0 3px var(--copper-dim); transition:box-shadow .15s; }
+        .brand:hover .brand-mark{ box-shadow:0 0 0 2px var(--panel), 0 0 0 3px var(--copper); }
+        .brand-mark img{ width:100%; height:100%; object-fit:cover; display:block; }
+        .brand-name{ font-weight:800; font-size:15.5px; color:var(--text); letter-spacing:-.01em; }
+
+        .nav-links{ display:flex; gap:2px; flex-wrap:wrap; overflow-x:auto; scrollbar-width:none; }
+        .nav-links::-webkit-scrollbar{ display:none; }
+        .nav-links a{
+            color:var(--text-dim); text-decoration:none; padding:7px 12px; border-radius:8px; font-size:13.5px; font-weight:500;
+            white-space:nowrap; transition:background .12s, color .12s;
+        }
+        .nav-links a:hover{ background:var(--panel-2); color:var(--text); }
+        .nav-links a.active{ background:var(--copper-dim); color:var(--copper-deep); font-weight:700; }
+
+        .user-pill{
+            display:flex; align-items:center; gap:8px; background:var(--panel-2); border:1px solid var(--border);
+            border-radius:20px; padding:5px 6px 5px 12px; flex-shrink:0;
+        }
+        .user-pill select{
+            background:transparent; border:none; color:var(--text); font-family:'Vazirmatn'; font-size:13px; outline:none;
+        }
+        .user-pill select option{ background:var(--panel); color:var(--text); }
+        .user-avatar{ width:24px; height:24px; border-radius:50%; background:var(--teal-dim); color:var(--teal); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; }
+
+        .content-wrap{ padding:26px 20px 60px; max-width:1100px; margin:0 auto; }
+
+        .panel{ background:var(--panel); border:1px solid var(--border); border-radius:12px; box-shadow:var(--shadow-sm); transition:box-shadow .15s, border-color .15s, transform .15s; }
+        a.panel:hover{ transform:translateY(-2px); box-shadow:var(--shadow-md); border-color:var(--copper); }
+
+        .combo{ position:relative; }
+        .combo-list{
+            position:absolute; top:calc(100% + 4px); right:0; left:0; background:var(--panel); border:1px solid var(--border);
+            border-radius:10px; max-height:240px; overflow-y:auto; z-index:40; display:none; box-shadow:var(--shadow-lg);
+        }
+        .combo-list.open{ display:block; }
+        .combo-item{ padding:9px 12px; font-size:13px; cursor:pointer; border-radius:6px; margin:2px; }
+        .combo-item:hover, .combo-item.active{ background:var(--copper-dim); color:var(--copper-deep); }
+        .combo-empty{ padding:14px 12px; font-size:12.5px; color:var(--text-faint); text-align:center; }
+        .combo-group{ font-size:10.5px; color:var(--text-faint); font-family:'JetBrains Mono'; letter-spacing:.5px; padding:8px 12px 4px; text-transform:uppercase; }
+        .panel-head{
+            padding:15px 18px; border-bottom:1px solid var(--border); font-weight:700; font-size:14.5px;
+            position:relative; padding-inline-start:22px;
+        }
+        .panel-head::before{
+            content:''; position:absolute; right:18px; top:50%; transform:translateY(-50%);
+            width:4px; height:16px; border-radius:3px; background:var(--copper);
+        }
+        html[dir="rtl"] .panel-head::before{ right:auto; left:18px; }
+        .panel-body{ padding:18px; }
+
+        .form-control, .form-select{
+            background:var(--bg) !important; border:1px solid var(--border) !important; color:var(--text) !important;
+            border-radius:9px !important; font-size:13.5px !important;
+        }
+        .form-control:focus, .form-select:focus{
+            border-color:var(--copper) !important; box-shadow:0 0 0 .18rem rgba(217,123,63,.16) !important;
+        }
+        .form-control::placeholder{ color:var(--text-faint); }
+        label.form-label{ color:var(--text-dim); font-size:12.5px; font-weight:600; }
+
+        .btn{ border-radius:9px !important; font-weight:600; font-size:13.5px; }
+        .btn-gk-primary{ background:var(--copper); border-color:var(--copper); color:#fff; font-weight:700; box-shadow:0 2px 6px rgba(217,123,63,.3); }
+        .btn-gk-primary:hover{ background:var(--copper-deep); border-color:var(--copper-deep); color:#fff; box-shadow:0 3px 10px rgba(217,123,63,.4); }
+        .btn-ghost{ background:var(--panel); border:1px solid var(--border) !important; color:var(--text-dim) !important; }
+        .btn-ghost:hover{ background:var(--panel-2); border-color:var(--text-faint) !important; color:var(--text) !important; }
+
+        table{ color:var(--text); }
+        .table-gk{ border-collapse:separate; border-spacing:0; }
+        .table-gk thead th{ color:var(--text-faint); font-size:10.5px; text-transform:uppercase; letter-spacing:.5px; border-color:var(--border); font-family:'JetBrains Mono'; background:var(--panel-2); padding:10px 12px; }
+        .table-gk td{ border-color:var(--border); font-size:13.5px; vertical-align:middle; padding:10px 12px; }
+        .table-gk tbody tr{ transition:background .1s; }
+        .table-gk tbody tr:hover{ background:var(--panel-2); }
+
+        .badge{ font-weight:600 !important; border-radius:6px !important; padding:.4em .65em !important; }
+
+        .alert{ border-radius:10px !important; }
+        .alert-gk-success{ background:var(--teal-dim); border:1px solid var(--teal); color:var(--teal); }
+        .alert-gk-error{ background:var(--danger-dim); border:1px solid var(--danger); color:var(--danger); }
+    </style>
+</head>
+<body>
+    <div class="navbar-gk">
+        <a href="{% url 'game_index' %}" class="brand">
+            <div class="brand-mark"><img src="{% static 'images/app-icon.jpeg' %}" alt="گیم‌کارن"></div>
+            <span class="brand-name">گیم‌کارن</span>
+        </a>
+
+        <div class="nav-links">
+            <a href="{% url 'game_index' %}" {% if request.resolver_match.url_name == 'game_index' %}class="active"{% endif %}>خانه</a>
+            <a href="{% url 'purchase_entry' %}" {% if request.resolver_match.url_name == 'purchase_entry' %}class="active"{% endif %}>خرید</a>
+            <a href="{% url 'inventory' %}" {% if request.resolver_match.url_name == 'inventory' %}class="active"{% endif %}>موجودی</a>
+            <a href="{% url 'serial_generator' %}" {% if request.resolver_match.url_name == 'serial_generator' or request.resolver_match.url_name == 'serial_labels_print' %}class="active"{% endif %}>تولید سریال</a>
+            <a href="{% url 'game_sales_invoice' %}" {% if request.resolver_match.url_name == 'game_sales_invoice' %}class="active"{% endif %}>فروش</a>
+            <a href="{% url 'game_install' %}" {% if request.resolver_match.url_name == 'game_install' %}class="active"{% endif %}>نصب بازی</a>
+            <a href="{% url 'expense_entry' %}" {% if request.resolver_match.url_name == 'expense_entry' %}class="active"{% endif %}>هزینه</a>
+            <a href="{% url 'games_manage' %}" {% if request.resolver_match.url_name == 'games_manage' %}class="active"{% endif %}>بازی‌ها</a>
+            <a href="{% url 'consignment' %}" {% if request.resolver_match.url_name == 'consignment' %}class="active"{% endif %}>امانی</a>
+            <a href="{% url 'repair' %}" {% if request.resolver_match.url_name == 'repair' %}class="active"{% endif %}>تعمیرات</a>
+            <a href="{% url 'reports_home' %}" {% if request.resolver_match.url_name == 'reports_home' or request.resolver_match.url_name == 'report_detail' %}class="active"{% endif %}>گزارش</a>
+            <a href="{% url 'parties_list' %}" {% if request.resolver_match.url_name == 'parties_list' or request.resolver_match.url_name == 'party_detail' %}class="active"{% endif %}>حساب اشخاص</a>
+            <a href="/admin/" target="_blank">تنظیمات (پرسنل و کالاها)</a>
+        </div>
+
+        <form method="post" action="{% url 'logout' %}" class="user-pill">
+            {% csrf_token %}
+            <div class="user-avatar">{% if active_personnel %}{{ active_personnel.name|first }}{% else %}؟{% endif %}</div>
+            <span style="font-size:13px; color:var(--text); font-weight:600;">{{ active_personnel.name|default:"—" }}</span>
+            <button type="submit" class="btn btn-sm" style="background:none; border:none; color:var(--text-faint); padding:2px 6px;" title="خروج">خروج</button>
+        </form>
+    </div>
+
+    <div class="content-wrap">
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert {% if message.tags == 'error' %}alert-gk-error{% else %}alert-gk-success{% endif %}" role="alert">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        {% block content %}{% endblock %}
+    </div>
+</body>
+</html>

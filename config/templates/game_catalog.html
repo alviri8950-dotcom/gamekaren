@@ -1,0 +1,198 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>مدیریت لیست بازی‌ها - گیم کارن</title>
+    <link rel="icon" type="image/jpeg" href="{% static 'images/app-icon.jpeg' %}">
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Tahoma, sans-serif;
+            background: #0f172a;
+            color: #ffffff;
+            padding: 24px 16px 40px;
+        }
+
+        .page {
+            max-width: 1320px;
+            margin: 0 auto;
+        }
+
+        .panel {
+            background: #111827;
+            border: 1px solid #334155;
+            border-radius: 16px;
+            padding: 18px;
+            margin-bottom: 18px;
+        }
+
+        .top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .top h1 {
+            margin: 0 0 10px;
+            font-size: 32px;
+        }
+
+        .top p {
+            margin: 0;
+            color: #cbd5e1;
+            font-size: 15px;
+            line-height: 1.9;
+        }
+
+        .toolbar {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .toolbar a,
+        .toolbar button {
+            display: inline-block;
+            border: 0;
+            text-decoration: none;
+            color: #ffffff;
+            background: #2563eb;
+            padding: 10px 16px;
+            border-radius: 10px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .toolbar button.secondary {
+            background: #0f766e;
+        }
+
+        .message {
+            border-radius: 10px;
+            padding: 12px 14px;
+            margin-bottom: 16px;
+            font-size: 15px;
+            background: rgba(34, 197, 94, 0.16);
+            border: 1px solid rgba(34, 197, 94, 0.4);
+            color: #bbf7d0;
+        }
+
+        .list-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+        }
+
+        .game-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 14px;
+            background: #0b1324;
+            border: 1px solid #334155;
+            border-radius: 12px;
+            padding: 14px 16px;
+        }
+
+        .game-name {
+            font-size: 16px;
+            color: #ffffff;
+            line-height: 1.7;
+        }
+
+        .toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #cbd5e1;
+            font-size: 14px;
+            min-width: 110px;
+            justify-content: flex-end;
+        }
+
+        .toggle input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+        }
+
+        .footer-actions {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 18px;
+        }
+
+        .save-btn {
+            border: 0;
+            border-radius: 10px;
+            background: #2563eb;
+            color: #ffffff;
+            height: 42px;
+            padding: 0 20px;
+            font-size: 15px;
+            cursor: pointer;
+        }
+
+        @media (max-width: 900px) {
+            .list-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="page">
+        <div class="panel top">
+            <div>
+                <h1>مدیریت لیست بازی‌ها</h1>
+                <p>فقط بازی‌هایی که تیک آن‌ها روشن باشد، در صفحه نصب بازی نمایش داده می‌شوند.</p>
+            </div>
+
+            <div class="toolbar">
+                <a href="{% url 'game_goods_entry' 'game_install' %}">بازگشت به نصب بازی</a>
+
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="update_from_internet">
+                    <button type="submit" class="secondary">Update / بروزرسانی لیست</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="panel">
+            {% if success_message %}
+                <div class="message">{{ success_message }}</div>
+            {% endif %}
+
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="save_enabled_games">
+
+                <div class="list-grid">
+                    {% for item in game_catalog %}
+                        <label class="game-item">
+                            <span class="game-name">{{ item.name }}</span>
+                            <span class="toggle">
+                                <span>نمایش</span>
+                                <input type="checkbox" name="enabled_games" value="{{ item.name }}" {% if item.enabled %}checked{% endif %}>
+                            </span>
+                        </label>
+                    {% endfor %}
+                </div>
+
+                <div class="footer-actions">
+                    <button type="submit" class="save-btn">ذخیره تغییرات</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,160 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}ورود کالا - گیم کارن{% endblock %}
+
+{% block content %}
+<style>
+    .entry-container {
+        max-width: 900px;
+        margin: 0 auto;
+    }
+    .form-label {
+        color: var(--cyan);
+        font-weight: bold;
+        margin-bottom: 8px;
+    }
+    .form-control, .form-select {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--border);
+        color: #fff;
+        border-radius: 12px;
+        padding: 12px;
+    }
+    .form-control:focus, .form-select:focus {
+        background: rgba(255, 255, 255, 0.1);
+        border-color: var(--cyan);
+        color: #fff;
+        box-shadow: 0 0 10px rgba(41, 211, 255, 0.2);
+    }
+    .scanner-box {
+        border: 2px dashed var(--cyan);
+        border-radius: 15px;
+        padding: 20px;
+        text-align: center;
+        background: rgba(41, 211, 255, 0.05);
+        margin-bottom: 25px;
+        cursor: pointer;
+        transition: 0.3s;
+    }
+    .scanner-box:hover {
+        background: rgba(41, 211, 255, 0.1);
+    }
+    .btn-submit {
+        background: linear-gradient(135deg, var(--cyan), var(--blue));
+        border: none;
+        color: #fff;
+        padding: 15px 30px;
+        border-radius: 14px;
+        font-weight: bold;
+        width: 100%;
+        margin-top: 20px;
+        transition: 0.3s;
+    }
+    .btn-submit:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(41, 211, 255, 0.4);
+    }
+    .badge-type {
+        background: rgba(41, 211, 255, 0.2);
+        color: var(--cyan);
+        padding: 5px 15px;
+        border-radius: 8px;
+        font-size: 0.9rem;
+    }
+    .game-links {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+        margin-top: 10px;
+    }
+    .game-link-item {
+        display: block;
+        text-decoration: none;
+        text-align: center;
+        padding: 10px 12px;
+        border-radius: 10px;
+        background: rgba(41, 211, 255, 0.08);
+        border: 1px solid rgba(41, 211, 255, 0.25);
+        color: #fff;
+        transition: 0.3s;
+    }
+    .game-link-item:hover {
+        background: rgba(41, 211, 255, 0.18);
+        color: #fff;
+    }
+</style>
+
+<div class="entry-container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h4 class="text-cyan mb-0">ثبت ورود کالا</h4>
+        <span class="badge-type">
+            نوع ورودی:
+            {% if entry_type == 'game_install' %} نصب بازی
+            {% elif entry_type == 'purchase' %} خرید جدید
+            {% elif entry_type == 'return' %} مرجوعی مشتری
+            {% else %} عمومی {% endif %}
+        </span>
+    </div>
+
+    <form action="{% url 'game_delivery_registration' %}" method="post">
+        {% csrf_token %}
+        <input type="hidden" name="entry_type" value="{{ entry_type }}">
+
+        <div class="scanner-box" onclick="document.getElementById('barcode_input').focus()">
+            <div class="fs-1 mb-2">📸</div>
+            <p class="mb-0">بارکد کالا را اسکن کنید یا دستی وارد نمایید</p>
+            <input type="text" id="barcode_input" name="barcode" class="form-control mt-3 text-center" placeholder="کد بارکد..." autofocus>
+        </div>
+
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label class="form-label">نام کالا / دستگاه</label>
+                <input type="text" name="item_name" class="form-control" required placeholder="مثلاً: PS5 Slim">
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">سریال دستگاه (S/N)</label>
+                <input type="text" name="serial_number" class="form-control" placeholder="شماره سریال">
+            </div>
+
+            <div class="col-md-6">
+                <label class="form-label">نام مشتری</label>
+                <input type="text" name="customer_name" class="form-control" required placeholder="نام و نام خانوادگی">
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">شماره تماس</label>
+                <input type="tel" name="customer_phone" class="form-control" required placeholder="0912-------">
+            </div>
+
+            {% if entry_type == 'game_install' %}
+            <div class="col-12">
+                <label class="form-label">۱۰ بازی انتخابی</label>
+                <div class="game-links">
+                    {% for game in game_names|slice:":10" %}
+                        <a href="?selected_game={{ game|urlencode }}" class="game-link-item">{{ game }}</a>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="col-12">
+                <label class="form-label">نام بازی انتخاب‌شده</label>
+                <input type="text" name="game_name" class="form-control" value="{{ request.GET.selected_game|default:'' }}" placeholder="نام بازی انتخابی">
+            </div>
+            {% endif %}
+
+            <div class="col-12">
+                <label class="form-label">توضیحات تکمیلی</label>
+                <textarea name="description" class="form-control" rows="3" placeholder="متعلقات همراه، ایرادات ظاهری و ..."></textarea>
+            </div>
+        </div>
+
+        <button type="submit" class="btn-submit">ثبت و مرحله بعد</button>
+    </form>
+</div>
+
+<script>
+    window.onload = function() {
+        document.getElementById('barcode_input').focus();
+    };
+</script>
+{% endblock %}
