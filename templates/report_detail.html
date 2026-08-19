@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load jalali_filters %}
 {% block title %}{{ report_title }} - گیم‌کارن{% endblock %}
 {% block content %}
 
@@ -180,6 +181,14 @@
     </div>
 </div>
 <div class="panel mb-3">
+    <div class="panel-head">سرمایه</div>
+    <div class="panel-body">
+        <div class="d-flex justify-content-between mb-2"><span style="color:var(--text-dim);">جمع موجودی کالا</span><strong class="mono">{{ inventory_total_value }} تومان</strong></div>
+        <div class="d-flex justify-content-between mb-2"><span style="color:var(--text-dim);">جمع موجودی اولیه</span><strong class="mono">{{ capital_account_balance }} تومان</strong></div>
+        <div class="d-flex justify-content-between"><span style="color:var(--text-dim);">جمع کل سرمایه</span><strong class="mono" style="color:var(--teal);">{{ capital_total }} تومان</strong></div>
+    </div>
+</div>
+<div class="panel mb-3">
     <div class="panel-head">ارزش موجودی به تفکیک گروه کالا</div>
     <div class="table-responsive">
         <table class="table table-gk mb-0">
@@ -200,18 +209,38 @@
     </div>
 </div>
 <div class="panel mb-3">
-    <div class="panel-head">واحدهای سریال‌دار در انبار</div>
-    <div class="table-responsive">
-        <table class="table table-gk mb-0">
-            <thead><tr><th>سریال</th><th>کالا</th><th>قیمت خرید (تومان)</th></tr></thead>
-            <tbody>
-                {% for item in in_stock_items %}
-                <tr><td class="mono">{{ item.serial_number }}</td><td>{% if item.accessory %}{{ item.accessory.name }}{% else %}{{ item.device_name.name }} {{ item.device_type.name|default:"" }}{% endif %}</td><td class="mono">{{ item.unit_cost }}</td></tr>
-                {% empty %}<tr><td colspan="3" class="text-center py-4" style="color:var(--text-faint);">موردی نیست</td></tr>{% endfor %}
-            </tbody>
-            {% if in_stock_items %}<tfoot><tr><th colspan="2">جمع</th><th class="mono">{{ in_stock_value }}</th></tr></tfoot>{% endif %}
-        </table>
+    <div class="panel-head">واحدهای سریال‌دار در انبار (به تفکیک کالا)</div>
+    <div class="p-2">
+        {% for g in serial_groups %}
+        <details class="mb-2" style="border:1px solid var(--panel-2); border-radius:8px; overflow:hidden;">
+            <summary style="cursor:pointer; display:flex; justify-content:space-between; align-items:center; padding:10px 12px; background:var(--panel-2);">
+                <span>{{ g.label }} <span class="mono" style="color:var(--text-faint); font-size:11px;">({{ g.count }} عدد)</span></span>
+                <span class="mono" style="color:var(--teal);">{{ g.value }} تومان</span>
+            </summary>
+            <div style="padding:8px 12px;">
+                {% for sg in g.serial_groups %}
+                <details class="mb-1" style="border:1px solid var(--panel-2); border-radius:6px; margin-inline-start:14px;">
+                    <summary style="cursor:pointer; display:flex; justify-content:space-between; align-items:center; padding:8px 10px;">
+                        <span class="mono">{{ sg.serial|default:"بدون سریال" }} <span style="color:var(--text-faint); font-size:11px;">({{ sg.count }} عدد)</span></span>
+                        <span class="mono">{{ sg.value }} تومان</span>
+                    </summary>
+                    <div class="table-responsive">
+                        <table class="table table-gk mb-0">
+                            <thead><tr><th>#</th><th>قیمت خرید (تومان)</th><th>تاریخ ورود</th></tr></thead>
+                            <tbody>
+                                {% for it in sg.items %}
+                                <tr><td class="mono">{{ forloop.counter }}</td><td class="mono">{{ it.unit_cost }}</td><td class="mono">{{ it.created_at|jalali }}</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </details>
+                {% endfor %}
+            </div>
+        </details>
+        {% empty %}<div class="text-center py-4" style="color:var(--text-faint);">موردی نیست</div>{% endfor %}
     </div>
+    {% if serial_groups %}<div class="d-flex justify-content-between px-3 py-2" style="border-top:1px solid var(--panel-2);"><strong>جمع</strong><strong class="mono">{{ in_stock_value }} تومان</strong></div>{% endif %}
 </div>
 <div class="panel">
     <div class="panel-head">موجودی فله‌ای</div>

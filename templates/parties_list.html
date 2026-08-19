@@ -28,6 +28,18 @@
     </div>
 </div>
 
+<div class="row g-3 mb-3">
+    <div class="col-12">
+        <div class="panel p-3">
+            <div style="color:var(--text-faint); font-size:12px;">سرمایه (جمع موجودی کالا + جمع موجودی اولیه)</div>
+            <div class="mono" style="font-size:20px; font-weight:800; color:var(--teal);">{{ capital_summary.capital_total }} تومان</div>
+            <div style="color:var(--text-faint); font-size:11px; margin-top:4px;">
+                موجودی کالا: {{ capital_summary.inventory_value }} تومان — موجودی اولیه: {{ capital_summary.capital_balance }} تومان
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="panel mb-3">
     <div class="panel-head">بانک‌ها</div>
     <div class="table-responsive">

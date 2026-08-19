@@ -162,12 +162,80 @@ class BankAccountAdmin(admin.ModelAdmin):
     list_editable = ("balance", "is_active", "order")
 
 
+class PartyAdminForm(forms.ModelForm):
+    BALANCE_TYPE_CHOICES = [
+        ("settled", "تسویه (بدون مانده)"),
+        ("debtor", "بدهکار (شخص به فروشگاه مدیونه)"),
+        ("creditor", "بستانکار (فروشگاه به شخص مدیونه)"),
+    ]
+    balance_type = forms.ChoiceField(
+        label="نوع مانده حساب", choices=BALANCE_TYPE_CHOICES, required=True,
+    )
+    balance_amount = forms.IntegerField(
+        label="مبلغ مانده حساب (تومان)", required=False, min_value=0, initial=0,
+        help_text="همیشه عدد مثبت وارد کن؛ نوع بدهکار/بستانکار بودن رو از گزینه‌ی بالا مشخص کن.",
+    )
+
+    class Meta:
+        model = Party
+        fields = ("name", "kind", "phone", "sms_notifications_enabled")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        instance = kwargs.get("instance")
+        if instance and instance.pk:
+            if instance.balance > 0:
+                self.fields["balance_type"].initial = "debtor"
+                self.fields["balance_amount"].initial = instance.balance
+            elif instance.balance < 0:
+                self.fields["balance_type"].initial = "creditor"
+                self.fields["balance_amount"].initial = -instance.balance
+            else:
+                self.fields["balance_type"].initial = "settled"
+                self.fields["balance_amount"].initial = 0
+        else:
+            self.fields["balance_type"].initial = "settled"
+            self.fields["balance_amount"].initial = 0
+
+    def clean(self):
+        cleaned = super().clean()
+        balance_type = cleaned.get("balance_type")
+        amount = cleaned.get("balance_amount") or 0
+        if balance_type in ("debtor", "creditor") and amount <= 0:
+            self.add_error("balance_amount", "برای بدهکار/بستانکار، مبلغ باید بزرگ‌تر از صفر باشه.")
+        return cleaned
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        balance_type = self.cleaned_data.get("balance_type")
+        amount = self.cleaned_data.get("balance_amount") or 0
+        if balance_type == "debtor":
+            instance.balance = amount
+        elif balance_type == "creditor":
+            instance.balance = -amount
+        else:
+            instance.balance = 0
+        if commit:
+            instance.save()
+        return instance
+
+
 @admin.register(Party)
 class PartyAdmin(admin.ModelAdmin):
-    list_display = ("name", "kind", "balance", "phone", "sms_notifications_enabled", "created_at")
+    form = PartyAdminForm
+    list_display = ("name", "kind", "balance_status_display", "phone", "sms_notifications_enabled", "created_at")
     list_filter = ("kind", "sms_notifications_enabled")
-    list_editable = ("balance", "phone", "sms_notifications_enabled")
+    list_editable = ("phone", "sms_notifications_enabled")
     search_fields = ("name", "phone")
+    fields = ("name", "kind", "balance_type", "balance_amount", "phone", "sms_notifications_enabled")
+
+    def balance_status_display(self, obj):
+        if obj.balance > 0:
+            return f"بدهکار: {obj.balance} تومان"
+        if obj.balance < 0:
+            return f"بستانکار: {-obj.balance} تومان"
+        return "تسویه"
+    balance_status_display.short_description = "مانده حساب"
 
 
 @admin.register(PartyLedgerEntry)

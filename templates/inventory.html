@@ -5,26 +5,39 @@
 
 <div class="panel mb-3">
     <div class="panel-head d-flex justify-content-between align-items-center">
-        <span>واحدهای دارای سریال (در انبار)</span>
-        <span class="mono" style="font-size:11px; color:var(--text-faint);">{{ in_stock_items|length }} مورد</span>
+        <span>واحدهای دارای سریال (در انبار) — به تفکیک کالا</span>
     </div>
-    <div class="table-responsive">
-        <table class="table table-gk mb-0">
-            <thead><tr><th>سریال</th><th>نام دستگاه</th><th>نوع</th><th>قیمت خرید (تومان)</th><th>تاریخ ورود</th></tr></thead>
-            <tbody>
-                {% for item in in_stock_items %}
-                <tr>
-                    <td class="mono">{{ item.serial_number }}</td>
-                    <td>{{ item.device_name.name }}</td>
-                    <td>{{ item.device_type.name|default:"—" }}</td>
-                    <td class="mono">{{ item.unit_cost }}</td>
-                    <td class="mono">{{ item.created_at|jalali }}</td>
-                </tr>
-                {% empty %}
-                <tr><td colspan="5" class="text-center py-4" style="color:var(--text-faint);">فعلاً کالای سریال‌دار در انبار نیست</td></tr>
+    <div class="p-2">
+        {% for g in serial_groups %}
+        <details class="mb-2" style="border:1px solid var(--panel-2); border-radius:8px; overflow:hidden;">
+            <summary style="cursor:pointer; display:flex; justify-content:space-between; align-items:center; padding:10px 12px; background:var(--panel-2);">
+                <span>{{ g.label }} <span class="mono" style="color:var(--text-faint); font-size:11px;">({{ g.count }} عدد)</span></span>
+                <span class="mono" style="color:var(--teal);">{{ g.value }} تومان</span>
+            </summary>
+            <div style="padding:8px 12px;">
+                {% for sg in g.serial_groups %}
+                <details class="mb-1" style="border:1px solid var(--panel-2); border-radius:6px; margin-inline-start:14px;">
+                    <summary style="cursor:pointer; display:flex; justify-content:space-between; align-items:center; padding:8px 10px;">
+                        <span class="mono">{{ sg.serial|default:"بدون سریال" }} <span style="color:var(--text-faint); font-size:11px;">({{ sg.count }} عدد)</span></span>
+                        <span class="mono">{{ sg.value }} تومان</span>
+                    </summary>
+                    <div class="table-responsive">
+                        <table class="table table-gk mb-0">
+                            <thead><tr><th>#</th><th>قیمت خرید (تومان)</th><th>تاریخ ورود</th></tr></thead>
+                            <tbody>
+                                {% for it in sg.items %}
+                                <tr><td class="mono">{{ forloop.counter }}</td><td class="mono">{{ it.unit_cost }}</td><td class="mono">{{ it.created_at|jalali }}</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </details>
                 {% endfor %}
-            </tbody>
-        </table>
+            </div>
+        </details>
+        {% empty %}
+        <div class="text-center py-4" style="color:var(--text-faint);">فعلاً کالای سریال‌دار در انبار نیست</div>
+        {% endfor %}
     </div>
 </div>
 

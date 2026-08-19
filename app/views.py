@@ -33,9 +33,14 @@ def require_permission(perm_name):
 
 def party_ledger_add(party_name, amount, description, kind='other'):
     """مبلغ رو به حساب یک شخص اضافه/کم می‌کنه و یک ردیف تراکنش ثبت می‌کنه.
-    amount مثبت یعنی شخص بدهکارتر می‌شه (به ما مدیون‌تر)، منفی یعنی بستانکارتر می‌شه (ما بهش مدیون‌تریم)."""
+    amount مثبت یعنی شخص بدهکارتر می‌شه (به ما مدیون‌تر)، منفی یعنی بستانکارتر می‌شه (ما بهش مدیون‌تریم).
+    اگه اسم دقیقاً همون عنوان ویژه‌ی «موجودی اولیه» باشه، به‌جای ساختن بدهی برای یک شخص،
+    مبلغ به حساب سرمایه هدایت می‌شه — تا هیچ‌وقت این مبلغ توی گزارش بدهکاران/بستانکاران دیده نشه."""
     name = (party_name or '').strip()
     if not name:
+        return None
+    if is_capital_supplier_name(name):
+        capital_ledger_add(amount, description)
         return None
     party, _ = Party.objects.get_or_create(name=name, defaults={'kind': kind})
     party.balance += amount
@@ -69,6 +74,65 @@ def capital_ledger_add(amount, description):
     account.balance += amount
     account.save(update_fields=['balance'])
     return account
+
+
+def get_capital_account_balance():
+    """مانده‌ی فعلی حساب سرمایه (بدون ساختن رکورد جدید اگه هنوز وجود نداره)."""
+    account = BankAccount.objects.filter(label='سرمایه').first()
+    return account.balance if account else 0
+
+
+def compute_inventory_total_value():
+    """جمع ارزش کل موجودی انبار (سریال‌دار + فله‌ای) — برای «سرمایه» و گزارش موجودی استفاده می‌شه."""
+    serial_value = InventoryItem.objects.filter(status='in_stock').aggregate(v=Sum('unit_cost'))['v'] or 0
+    bulk_lots = PurchaseRecord.objects.filter(serial_number='', is_voided=False, remaining_quantity__gt=0)
+    bulk_value = sum(lot.remaining_quantity * lot.unit_price for lot in bulk_lots)
+    return serial_value, bulk_value
+
+
+def compute_capital_summary():
+    """خلاصه‌ی «سرمایه»: جمع موجودی کالا + جمع موجودی اولیه (نه بدهکار/بستانکار واقعی)."""
+    serial_value, bulk_value = compute_inventory_total_value()
+    inventory_value = serial_value + bulk_value
+    capital_balance = get_capital_account_balance()
+    return {
+        'inventory_value': inventory_value,
+        'capital_balance': capital_balance,
+        'capital_total': inventory_value + capital_balance,
+    }
+
+
+def build_serial_item_groups(items_qs):
+    """گروه‌بندی دوسطحیِ واحدهای سریال‌دار موجود در انبار: سطح اول به‌تفکیک نام کالا
+    (صرف‌نظر از سریال)، سطح دوم داخل هر کالا به‌تفکیک شماره سریال — به‌جای فهرست تخت
+    همه‌ی واحدها، جمع هر گروه نشون داده می‌شه و با کلیک باز می‌شه."""
+    groups = {}
+    for it in items_qs:
+        if it.accessory_id:
+            product_key = ('accessory', it.accessory_id)
+            label = str(it.accessory)
+        else:
+            product_key = ('device', it.device_name_id, it.device_type_id)
+            type_part = f" {it.device_type.name}" if it.device_type else ""
+            label = f"{it.device_name.name if it.device_name else 'نامشخص'}{type_part}"
+
+        g = groups.setdefault(product_key, {'label': label, 'count': 0, 'value': 0, 'serials': {}})
+        g['count'] += 1
+        g['value'] += it.unit_cost
+
+        serial = it.serial_number or ''
+        sg = g['serials'].setdefault(serial, {'serial': serial, 'count': 0, 'value': 0, 'items': []})
+        sg['count'] += 1
+        sg['value'] += it.unit_cost
+        sg['items'].append(it)
+
+    result = []
+    for g in groups.values():
+        g['serial_groups'] = sorted(g['serials'].values(), key=lambda sg: -sg['value'])
+        del g['serials']
+        result.append(g)
+    result.sort(key=lambda g: -g['value'])
+    return result
 
 
 def consume_fifo_cost(device_name, device_type, accessory, quantity_needed):
@@ -493,12 +557,14 @@ def install_print_to_printer(request, order_id):
 @require_permission('can_manage_parties')
 def parties_list(request):
     q = request.GET.get('q', '').strip()
-    parties = Party.objects.all()
+    # «موجودی اولیه» سرمایه‌ست، نه بدهی به یک شخص واقعی — از لیست و از جمع بدهکاران/بستانکاران کنار گذاشته می‌شه.
+    capital_party_ids = [p.id for p in Party.objects.all() if is_capital_supplier_name(p.name)]
+    parties = Party.objects.exclude(id__in=capital_party_ids)
     if q:
         parties = parties.filter(name__icontains=q)
     debtor_total = sum(p.balance for p in parties if p.balance > 0)
     creditor_total = sum(-p.balance for p in parties if p.balance < 0)
-    all_parties = Party.objects.values('id', 'name')
+    all_parties = Party.objects.exclude(id__in=capital_party_ids).values('id', 'name')
     return render(request, 'parties_list.html', {
         'parties': parties,
         'q': q,
@@ -506,6 +572,7 @@ def parties_list(request):
         'creditor_total': creditor_total,
         'banks': BankAccount.objects.filter(is_active=True),
         'all_parties_json': json.dumps(list(all_parties), ensure_ascii=False),
+        'capital_summary': compute_capital_summary(),
     })
 
 
@@ -523,7 +590,9 @@ def party_detail(request, party_id):
 @require_POST
 @require_permission('can_manage_parties')
 def party_pay(request, party_id):
-    """ثبت پرداخت به یک شخص (مثلاً تسویه با تأمین‌کننده یا نصاب) — از طریق بانک یا حواله از حساب شخص دیگر."""
+    """ثبت تراکنش برای یک شخص — از طریق بانک یا حواله از/به حساب شخص دیگر.
+    direction='receive' یعنی فروشگاه از این شخص مبلغ دریافت می‌کنه (مانده‌ی شخص کم می‌شه)،
+    direction='pay' یعنی فروشگاه به این شخص مبلغ پرداخت می‌کنه (مانده‌ی شخص زیاد می‌شه)."""
     if not _active_personnel(request):
         messages.error(request, 'اول باید «کاربر فعال» را از بالای صفحه انتخاب کنی.')
         return redirect('party_detail', party_id=party_id)
@@ -540,6 +609,10 @@ def party_pay(request, party_id):
         return redirect('party_detail', party_id=party_id)
 
     method = request.POST.get('method')  # 'bank' یا 'transfer'
+    direction = request.POST.get('direction')  # 'receive' یا 'pay'
+    if direction not in ('receive', 'pay'):
+        messages.error(request, 'مشخص کن دریافت یا پرداخت.')
+        return redirect('party_detail', party_id=party_id)
 
     with transaction.atomic():
         if method == 'bank':
@@ -547,21 +620,30 @@ def party_pay(request, party_id):
             if not bank:
                 messages.error(request, 'یک حساب بانکی انتخاب کن.')
                 return redirect('party_detail', party_id=party_id)
-            bank.balance -= amount
-            bank.save(update_fields=['balance'])
-            party_ledger_add(party.name, amount, f"پرداخت از {bank.label}", kind=party.kind)
+            if direction == 'pay':
+                bank.balance -= amount
+                bank.save(update_fields=['balance'])
+                party_ledger_add(party.name, amount, f"پرداخت از {bank.label}", kind=party.kind)
+            else:
+                bank.balance += amount
+                bank.save(update_fields=['balance'])
+                party_ledger_add(party.name, -amount, f"دریافت به {bank.label}", kind=party.kind)
         elif method == 'transfer':
-            source_name = request.POST.get('source_party_name', '').strip()
-            if not source_name:
-                messages.error(request, 'نام شخص واریزکننده (حواله) را وارد کن.')
+            other_name = request.POST.get('source_party_name', '').strip()
+            if not other_name:
+                messages.error(request, 'نام طرف حواله را وارد کن.')
                 return redirect('party_detail', party_id=party_id)
-            party_ledger_add(source_name, -amount, f"حواله به {party.name}", kind='other')
-            party_ledger_add(party.name, amount, f"دریافت حواله از {source_name}", kind=party.kind)
+            if direction == 'pay':
+                party_ledger_add(other_name, -amount, f"حواله به {party.name}", kind='other')
+                party_ledger_add(party.name, amount, f"دریافت حواله از {other_name}", kind=party.kind)
+            else:
+                party_ledger_add(party.name, -amount, f"حواله به {other_name}", kind=party.kind)
+                party_ledger_add(other_name, amount, f"دریافت حواله از {party.name}", kind='other')
         else:
             messages.error(request, 'محل پرداخت را انتخاب کن.')
             return redirect('party_detail', party_id=party_id)
 
-    messages.success(request, 'پرداخت ثبت شد.')
+    messages.success(request, 'تراکنش ثبت شد.')
     return redirect('party_detail', party_id=party_id)
 
 
@@ -951,10 +1033,11 @@ def games_manage(request):
 
 def inventory_view(request):
     stock_levels = StockLevel.objects.select_related('device_name', 'device_type').filter(quantity__gt=0)
-    in_stock_items = InventoryItem.objects.select_related('device_name', 'device_type').filter(status='in_stock')
+    in_stock_items = InventoryItem.objects.select_related('device_name', 'device_type', 'accessory').filter(status='in_stock')
+    serial_groups = build_serial_item_groups(in_stock_items)
     return render(request, 'inventory.html', {
         'stock_levels': stock_levels,
-        'in_stock_items': in_stock_items,
+        'serial_groups': serial_groups,
     })
 
 
@@ -1137,12 +1220,15 @@ def _build_report_context(request, report_type):
             bulk_lots_qs = bulk_lots_qs.filter(device_name_id=device_name_id)
         context['stock_levels'] = stock_qs
         context['in_stock_items'] = items_qs
+        context['serial_groups'] = build_serial_item_groups(items_qs)
 
         serial_value = items_qs.aggregate(v=Sum('unit_cost'))['v'] or 0
         bulk_value = sum(lot.remaining_quantity * lot.unit_price for lot in bulk_lots_qs)
         context['in_stock_value'] = serial_value
         context['bulk_stock_value'] = bulk_value
         context['inventory_total_value'] = serial_value + bulk_value
+        context['capital_account_balance'] = get_capital_account_balance()
+        context['capital_total'] = context['inventory_total_value'] + context['capital_account_balance']
 
         # جمع‌بندی به تفکیک هر گروه کالا (مثلاً PS5) — سریال‌دار + فله با هم، برای دیدن ارزش هر گروه
         def _group_key(dn, dt, acc):

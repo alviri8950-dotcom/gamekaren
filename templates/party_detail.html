@@ -20,7 +20,7 @@
 </div>
 
 <div class="panel mb-3">
-    <div class="panel-head">ثبت پرداخت به {{ party.name }}</div>
+    <div class="panel-head">ثبت تراکنش برای {{ party.name }}</div>
     <div class="panel-body">
         <form method="post" action="{% url 'party_pay' party.id %}" id="payForm">
             {% csrf_token %}
@@ -31,10 +31,10 @@
                     <input type="hidden" name="amount" id="payAmountHidden">
                 </div>
                 <div class="col-md-4">
-                    <label class="form-label">محل پرداخت</label>
+                    <label class="form-label">محل</label>
                     <select name="method" id="payMethodSelect" class="form-select">
-                        <option value="bank">از بانک</option>
-                        <option value="transfer">حواله (از حساب شخص دیگر)</option>
+                        <option value="bank">بانک</option>
+                        <option value="transfer">حواله (حساب شخص دیگر)</option>
                     </select>
                 </div>
                 <div class="col-md-4" id="bankFieldWrap">
@@ -45,11 +45,14 @@
                     </select>
                 </div>
                 <div class="col-md-4 d-none" id="transferFieldWrap">
-                    <label class="form-label">نام شخص واریزکننده</label>
+                    <label class="form-label">طرف حواله (نام شخص)</label>
                     <input type="text" name="source_party_name" class="form-control" placeholder="نام شخص">
                 </div>
             </div>
-            <button type="submit" class="btn btn-gk-primary">ثبت پرداخت</button>
+            <div class="d-flex gap-2">
+                <button type="submit" name="direction" value="receive" class="btn btn-gk-primary" style="background:var(--teal); border-color:var(--teal);">دریافت</button>
+                <button type="submit" name="direction" value="pay" class="btn" style="background:var(--danger); border-color:var(--danger); color:#fff;">پرداخت</button>
+            </div>
         </form>
     </div>
 </div>
